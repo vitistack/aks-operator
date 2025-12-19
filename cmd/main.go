@@ -17,9 +17,11 @@ limitations under the License.
 package main
 
 import (
+	"context"
 	"crypto/tls"
 	"flag"
 	"os"
+	"time"
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.
@@ -37,6 +39,7 @@ import (
 
 	"github.com/spf13/viper"
 	"github.com/vitistack/aks-operator/internal/controller"
+	"github.com/vitistack/aks-operator/internal/services/initializationservice"
 	"github.com/vitistack/aks-operator/internal/settings"
 	"github.com/vitistack/common/pkg/clients/k8sclient"
 	"github.com/vitistack/common/pkg/loggers/vlog"
@@ -201,9 +204,38 @@ func main() {
 		os.Exit(1)
 	}
 
+	// Check Azure environment variables
+	if err := initializationservice.CheckAzureEnvironment(); err != nil {
+		setupLog.Error(err, "Azure environment check failed")
+		os.Exit(1)
+	}
+
+	// Initialize Azure services
+	azureServices, err := initializationservice.InitializeAzureServices(mgr.GetClient())
+	if err != nil {
+		setupLog.Error(err, "failed to initialize Azure services")
+		os.Exit(1)
+	}
+
+	// Optionally validate Azure connectivity at startup
+	// This can be disabled for faster startup if Azure connectivity is guaranteed
+	if viper.GetBool(consts.AZURE_VALIDATE_CONNECTIVITY) {
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		if err := initializationservice.ValidateAzureConnectivity(ctx, azureServices); err != nil {
+			setupLog.Error(err, "Azure connectivity validation failed")
+			os.Exit(1)
+		}
+	}
+
 	if err := (&controller.KubernetesClusterReconciler{
-		Client: mgr.GetClient(),
-		Scheme: mgr.GetScheme(),
+		Client:             mgr.GetClient(),
+		Scheme:             mgr.GetScheme(),
+		AzureClientFactory: azureServices.ClientFactory,
+		AKSClusterManager:  azureServices.AKSClusterManager,
+		AgentPoolManager:   azureServices.AgentPoolManager,
+		VMSizeManager:      azureServices.VMSizeManager,
+		MachineClassMapper: azureServices.MachineClassMapper,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "KubernetesCluster")
 		os.Exit(1)
