@@ -34,3 +34,6 @@ go.work.sum
 # .vscode/
 hack/vitistack-crds
 bin/
+
+__debug_bin*
+.DS_Store
