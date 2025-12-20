@@ -28,6 +28,8 @@ go.work.sum
 # env file
 .env*
 !.env.example
+!.env.serviceprincipal.example
+!.env.userauth.example
 
 # Editor/IDE
 # .idea/

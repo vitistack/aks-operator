@@ -11,166 +11,70 @@ Vitistack Kubernetes provider for AKS (Azure Kubernetes Service)
 
 ## Azure Credentials Setup
 
-The operator requires Azure credentials to manage AKS clusters. You'll need to create an Azure Service Principal and configure the following environment variables:
+The operator requires Azure credentials to manage AKS clusters. Choose your authentication method:
 
-| Variable                | Description                            |
-| ----------------------- | -------------------------------------- |
-| `AZURE_SUBSCRIPTION_ID` | Your Azure subscription ID             |
-| `AZURE_OBJECT_ID`       | The Object ID of the service principal |
-| `AZURE_CLIENT_SECRET`   | The client secret for authentication   |
+| Method                                                         | Best For          | Admin Required      |
+| -------------------------------------------------------------- | ----------------- | ------------------- |
+| [User Credentials (Azure CLI)](docs/azure-user-credentials.md) | Local development | No                  |
+| [Service Principal](docs/azure-service-principal.md)           | Production, CI/CD | Yes (initial setup) |
+| [Workload Identity](docs/azure-workload-identity.md)           | Running in AKS    | Yes                 |
 
-### Step 1: Login to Azure CLI
+### Quick Start
+
+**Option 1: User Credentials (Easiest for local development)**
+
+If you have **Contributor** role on the subscription:
 
 ```bash
 az login
+export AZURE_SUBSCRIPTION_ID=$(az account show --query id -o tsv)
+make run
 ```
 
-### Step 2: Get your Subscription ID
+**Option 2: Service Principal (Recommended for production)**
 
 ```bash
-az account show --query id -o tsv
+export AZURE_SUBSCRIPTION_ID=<subscription-id>
+export AZURE_TENANT_ID=<tenant-id>
+export AZURE_CLIENT_ID=<client-id>
+export AZURE_CLIENT_SECRET=<client-secret>
+make run
 ```
 
-This returns your `AZURE_SUBSCRIPTION_ID`.
+See [Azure Authentication Guide](docs/azure-authentication.md) for detailed setup instructions.
 
-### Step 3: Create a Service Principal
+## Azure Resource Groups
 
-Create a service principal with Contributor role scoped to your subscription:
+The `spec.data.project` field maps to the Azure Resource Group name:
+
+```yaml
+apiVersion: vitistack.io/v1alpha1
+kind: KubernetesCluster
+metadata:
+  name: my-cluster
+spec:
+  data:
+    project: my-resource-group # Must exist in Azure
+    region: norwayeast
+```
+
+> **Important:** The resource group must exist before creating a cluster.
 
 ```bash
-az ad sp create-for-rbac \
-  --name "aks-operator-sp" \
-  --role Contributor \
-  --scopes /subscriptions/<SUBSCRIPTION_ID>
+az group create --name my-project --location norwayeast
 ```
 
-This command outputs:
+See [Azure Resource Groups Guide](docs/azure-resource-groups.md) for details.
 
-```json
-{
-  "appId": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
-  "displayName": "aks-operator-sp",
-  "password": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
-  "tenant": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
-}
-```
+## Documentation
 
-- `password` → Use as `AZURE_CLIENT_SECRET`
-
-> **Note:** If you don't have permission to create service principals (requires Azure AD admin), see [Alternative: Using an Existing Service Principal](#alternative-using-an-existing-service-principal) below.
-
-### Step 4: Get the Object ID
-
-```bash
-az ad sp show --id <appId> --query id -o tsv
-```
-
-This returns your `AZURE_OBJECT_ID`.
-
-### Step 5: Configure Environment Variables
-
-Copy the `.env.example` file and fill in your values:
-
-```bash
-cp .env.example .env
-```
-
-Edit `.env`:
-
-```dotenv
-AZURE_SUBSCRIPTION_ID=<your-subscription-id>
-AZURE_OBJECT_ID=<service-principal-object-id>
-AZURE_CLIENT_SECRET=<service-principal-password>
-```
-
-### Alternative: Using an Existing Service Principal
-
-If you don't have Azure AD admin permissions to create a service principal, an administrator can create one for you and grant you the Contributor role assignment.
-
-#### For Administrators
-
-Create a service principal and share the credentials with the user:
-
-```bash
-# Create the service principal
-az ad sp create-for-rbac \
-  --name "aks-operator-sp" \
-  --role Contributor \
-  --scopes /subscriptions/<SUBSCRIPTION_ID>
-
-# Get the Object ID to share
-az ad sp show --id <appId> --query id -o tsv
-```
-
-Share the `appId`, `password`, and Object ID with the user.
-
-#### For Non-Admin Users
-
-If an existing service principal already exists and you need to use it:
-
-1. **Get the credentials** from your administrator:
-
-   - `appId` (Client ID)
-   - `password` (Client Secret)
-   - Object ID
-
-2. **Request Contributor role assignment** on the subscription or resource group. Ask your administrator to run:
-
-   ```bash
-   # Assign Contributor role to the service principal on a subscription
-   az role assignment create \
-     --assignee <appId> \
-     --role Contributor \
-     --scope /subscriptions/<SUBSCRIPTION_ID>
-   ```
-
-   Or for a specific resource group (more restrictive):
-
-   ```bash
-   # Assign Contributor role to the service principal on a resource group
-   az role assignment create \
-     --assignee <appId> \
-     --role Contributor \
-     --scope /subscriptions/<SUBSCRIPTION_ID>/resourceGroups/<RESOURCE_GROUP_NAME>
-   ```
-
-3. **Verify the role assignment**:
-
-   ```bash
-   az role assignment list \
-     --assignee <appId> \
-     --scope /subscriptions/<SUBSCRIPTION_ID> \
-     -o table
-   ```
-
-4. **Configure your environment variables** as described in [Step 5](#step-5-configure-environment-variables).
-
-#### Required Permissions
-
-The service principal needs at minimum the following permissions:
-
-| Permission                             | Scope              | Purpose                                        |
-| -------------------------------------- | ------------------ | ---------------------------------------------- |
-| `Contributor`                          | Subscription or RG | Create/manage AKS clusters                     |
-| `Azure Kubernetes Service Contributor` | Subscription or RG | (Alternative) More restrictive AKS-only access |
-
-For production environments, consider using the more restrictive `Azure Kubernetes Service Contributor` role:
-
-```bash
-az role assignment create \
-  --assignee <appId> \
-  --role "Azure Kubernetes Service Contributor" \
-  --scope /subscriptions/<SUBSCRIPTION_ID>
-```
-
-### Using Workload Identity (Alternative)
-
-If running in Azure (AKS), you can use [Workload Identity](https://learn.microsoft.com/en-us/azure/aks/workload-identity-overview) instead of a client secret. The operator will automatically use `DefaultAzureCredential` which supports:
-
-- Environment variables
-- Workload Identity
-- Managed Identity
-- Azure CLI credentials
+- [Azure Authentication Overview](docs/azure-authentication.md)
+- [Service Principal Setup](docs/azure-service-principal.md) - For admins and production
+- [User Credentials Setup](docs/azure-user-credentials.md) - For local development
+- [Azure Permissions](docs/azure-permissions.md) - Required roles and permissions
+- [Resource Groups](docs/azure-resource-groups.md) - How projects map to resource groups
+- [Workload Identity](docs/azure-workload-identity.md) - For running in AKS
+- [Troubleshooting](docs/troubleshooting.md) - Common issues and solutions
 
 ## Development
 
@@ -189,9 +93,6 @@ make gosec
 
 # Run vulnerability check
 make govulncheck
-
-# Build the operator
-make build
 
 # Run locally
 make run

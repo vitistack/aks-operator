@@ -48,7 +48,7 @@ func NewAKSClusterManager(managedClusterClient interfaces.ManagedClusterClient, 
 
 // CreateCluster creates an AKS cluster from KubernetesCluster spec
 func (m *AKSClusterManagerImpl) CreateCluster(ctx context.Context, kubernetesCluster *vitistackv1alpha1.KubernetesCluster) (*armcontainerservice.ManagedCluster, error) {
-	vlog.Info("Creating AKS cluster", "cluster", kubernetesCluster.Name, "namespace", kubernetesCluster.Namespace)
+	vlog.Info("Creating AKS cluster", "cluster", kubernetesCluster.Name, "namespace", kubernetesCluster.Namespace, "clusterid", kubernetesCluster.Spec.Cluster.ClusterId)
 
 	resourceGroupName := m.getResourceGroupName(kubernetesCluster)
 	clusterName := m.getClusterName(kubernetesCluster)
@@ -61,13 +61,13 @@ func (m *AKSClusterManagerImpl) CreateCluster(ctx context.Context, kubernetesClu
 		return nil, fmt.Errorf("failed to create AKS cluster: %w", err)
 	}
 
-	vlog.Info("AKS cluster created successfully", "cluster", clusterName, "id", *result.ID)
+	vlog.Info("AKS cluster created successfully", "cluster", clusterName, "id", *result.ID, "clusterid", kubernetesCluster.Spec.Cluster.ClusterId)
 	return result, nil
 }
 
 // UpdateCluster updates an existing AKS cluster
 func (m *AKSClusterManagerImpl) UpdateCluster(ctx context.Context, kubernetesCluster *vitistackv1alpha1.KubernetesCluster) (*armcontainerservice.ManagedCluster, error) {
-	vlog.Info("Updating AKS cluster", "cluster", kubernetesCluster.Name, "namespace", kubernetesCluster.Namespace)
+	vlog.Info("Updating AKS cluster", "cluster", kubernetesCluster.Name, "namespace", kubernetesCluster.Namespace, "clusterid", kubernetesCluster.Spec.Cluster.ClusterId)
 
 	resourceGroupName := m.getResourceGroupName(kubernetesCluster)
 	clusterName := m.getClusterName(kubernetesCluster)
@@ -80,23 +80,38 @@ func (m *AKSClusterManagerImpl) UpdateCluster(ctx context.Context, kubernetesClu
 		return nil, fmt.Errorf("failed to update AKS cluster: %w", err)
 	}
 
-	vlog.Info("AKS cluster updated successfully", "cluster", clusterName, "id", *result.ID)
+	vlog.Info("AKS cluster updated successfully", "cluster", clusterName, "id", *result.ID, "clusterid", kubernetesCluster.Spec.Cluster.ClusterId)
 	return result, nil
 }
 
 // DeleteCluster deletes an AKS cluster
 func (m *AKSClusterManagerImpl) DeleteCluster(ctx context.Context, kubernetesCluster *vitistackv1alpha1.KubernetesCluster) error {
-	vlog.Info("Deleting AKS cluster", "cluster", kubernetesCluster.Name, "namespace", kubernetesCluster.Namespace)
+	vlog.Info("Deleting AKS cluster", "cluster", kubernetesCluster.Name, "namespace", kubernetesCluster.Namespace, "clusterid", kubernetesCluster.Spec.Cluster.ClusterId)
 
 	resourceGroupName := m.getResourceGroupName(kubernetesCluster)
 	clusterName := m.getClusterName(kubernetesCluster)
 
 	err := m.managedClusterClient.Delete(ctx, resourceGroupName, clusterName)
 	if err != nil {
+		// Treat "not found" errors as successful deletion - the resource doesn't exist
+		// This handles cases where:
+		// - The resource group was deleted manually
+		// - The AKS cluster was deleted manually
+		// - The cluster was never created successfully
+		if strings.Contains(err.Error(), "ResourceGroupNotFound") ||
+			strings.Contains(err.Error(), "ResourceNotFound") ||
+			strings.Contains(err.Error(), "not found") ||
+			strings.Contains(err.Error(), "404") {
+			vlog.Info("AKS cluster or resource group not found in Azure, treating as already deleted",
+				"cluster", clusterName,
+				"resourceGroup", resourceGroupName,
+				"clusterid", kubernetesCluster.Spec.Cluster.ClusterId)
+			return nil
+		}
 		return fmt.Errorf("failed to delete AKS cluster: %w", err)
 	}
 
-	vlog.Info("AKS cluster deleted successfully", "cluster", clusterName)
+	vlog.Info("AKS cluster deleted successfully", "cluster", clusterName, "clusterid", kubernetesCluster.Spec.Cluster.ClusterId)
 	return nil
 }
 
@@ -128,29 +143,56 @@ func (m *AKSClusterManagerImpl) GetClusterCredentials(ctx context.Context, kuber
 
 // ReconcileCluster reconciles the cluster state
 func (m *AKSClusterManagerImpl) ReconcileCluster(ctx context.Context, kubernetesCluster *vitistackv1alpha1.KubernetesCluster) (*armcontainerservice.ManagedCluster, error) {
-	vlog.Info("Reconciling AKS cluster", "cluster", kubernetesCluster.Name, "namespace", kubernetesCluster.Namespace)
-
 	existingCluster, err := m.GetCluster(ctx, kubernetesCluster)
 	if err != nil {
 		if strings.Contains(err.Error(), "not found") || strings.Contains(err.Error(), "ResourceNotFound") {
+			vlog.Info("🆕 Creating new AKS cluster", "cluster", kubernetesCluster.Name, "clusterid", kubernetesCluster.Spec.Cluster.ClusterId)
 			return m.CreateCluster(ctx, kubernetesCluster)
 		}
 		return nil, err
 	}
 
+	// Check if Azure is currently processing an operation on this cluster
+	// If so, skip the update and return the current state (no logging - nothing changed)
+	if existingCluster.Properties != nil && existingCluster.Properties.ProvisioningState != nil {
+		provisioningState := *existingCluster.Properties.ProvisioningState
+		if provisioningState == "Creating" || provisioningState == "Updating" || provisioningState == "Deleting" {
+			// Only log once when we first detect an operation in progress
+			return existingCluster, nil
+		}
+	}
+
+	// Check if actual changes are needed before triggering an update
+	if !m.needsUpdate(ctx, kubernetesCluster, existingCluster) {
+		// No logging - nothing changed, silence is golden
+		return existingCluster, nil
+	}
+
+	vlog.Info("🔄 Updating AKS cluster", "cluster", kubernetesCluster.Name, "clusterid", kubernetesCluster.Spec.Cluster.ClusterId)
 	result, err := m.UpdateCluster(ctx, kubernetesCluster)
 	if err != nil {
+		// Handle 409 Conflict - Azure is processing an operation
+		if strings.Contains(err.Error(), "409") ||
+			strings.Contains(err.Error(), "Conflict") ||
+			strings.Contains(err.Error(), "OperationNotAllowed") ||
+			strings.Contains(err.Error(), "in progress") {
+			vlog.Info("AKS cluster update conflict (operation in progress), will retry later",
+				"cluster", kubernetesCluster.Name,
+				"clusterid", kubernetesCluster.Spec.Cluster.ClusterId)
+			// Return the existing cluster state - don't treat as error
+			return existingCluster, nil
+		}
 		return nil, err
 	}
 
 	if m.agentPoolManager != nil {
 		if err := m.agentPoolManager.ReconcileAgentPools(ctx, kubernetesCluster); err != nil {
-			vlog.Error(err, "failed to reconcile agent pools")
+			vlog.Error(err, "failed to reconcile agent pools", "clusterid", kubernetesCluster.Spec.Cluster.ClusterId)
 			return result, fmt.Errorf("failed to reconcile agent pools: %w", err)
 		}
 	}
 
-	vlog.Info("AKS cluster reconciled successfully", "cluster", kubernetesCluster.Name, "provisioningState", *existingCluster.Properties.ProvisioningState)
+	vlog.Info("AKS cluster reconciled successfully", "cluster", kubernetesCluster.Name, "provisioningState", *existingCluster.Properties.ProvisioningState, "clusterid", kubernetesCluster.Spec.Cluster.ClusterId)
 	return result, nil
 }
 
@@ -177,15 +219,10 @@ func (m *AKSClusterManagerImpl) buildManagedCluster(ctx context.Context, kuberne
 		},
 	}
 
-	objectID := os.Getenv(consts.AZURE_OBJECT_ID)
-	clientSecret := os.Getenv(consts.AZURE_CLIENT_SECRET)
-	if objectID != "" && clientSecret != "" {
-		managedCluster.Properties.ServicePrincipalProfile = &armcontainerservice.ManagedClusterServicePrincipalProfile{
-			ClientID: to.Ptr(objectID),
-			Secret:   to.Ptr(clientSecret),
-		}
-		managedCluster.Identity = nil
-	}
+	// Note: We use SystemAssigned managed identity for the AKS cluster itself.
+	// The AZURE_CLIENT_ID/AZURE_CLIENT_SECRET/AZURE_TENANT_ID env vars are used
+	// by the operator to authenticate with Azure API (via DefaultAzureCredential),
+	// NOT for the AKS cluster's identity.
 
 	return managedCluster
 }
@@ -288,11 +325,11 @@ func (m *AKSClusterManagerImpl) getResourceGroupName(kubernetesCluster *vitistac
 }
 
 func (m *AKSClusterManagerImpl) getClusterName(kubernetesCluster *vitistackv1alpha1.KubernetesCluster) string {
-	return fmt.Sprintf("aks-%s-%s", kubernetesCluster.Namespace, kubernetesCluster.Name)
+	return kubernetesCluster.Spec.Cluster.ClusterId
 }
 
 func (m *AKSClusterManagerImpl) getDNSPrefix(kubernetesCluster *vitistackv1alpha1.KubernetesCluster) string {
-	return fmt.Sprintf("aks-%s-%s", kubernetesCluster.Namespace, kubernetesCluster.Name)
+	return kubernetesCluster.Spec.Cluster.ClusterId
 }
 
 func (m *AKSClusterManagerImpl) getKubernetesVersion(kubernetesCluster *vitistackv1alpha1.KubernetesCluster) string {
@@ -321,20 +358,67 @@ func (m *AKSClusterManagerImpl) resolveVMSize(ctx context.Context, machineClass 
 		return m.staticFallbackVMSize(machineClass, preferredPurpose)
 	}
 
-	// Try to map using the MachineClass mapper
+	// Try to map using the MachineClass mapper (no logging - called frequently)
 	mapping, err := m.machineClassMapper.MapMachineClassToVMSize(ctx, machineClass, location, preferredPurpose)
 	if err != nil {
-		vlog.Error(err, "Failed to map MachineClass, using fallback", "machineClass", machineClass)
 		return m.staticFallbackVMSize(machineClass, preferredPurpose)
 	}
 
-	vlog.Info("Resolved MachineClass to VM size",
-		"machineClass", machineClass,
-		"vmSize", mapping.VMSize,
-		"purpose", mapping.VMPurpose,
-	)
-
 	return mapping.VMSize
+}
+
+// needsUpdate compares the desired state with the existing Azure cluster to determine if an update is needed
+func (m *AKSClusterManagerImpl) needsUpdate(ctx context.Context, kubernetesCluster *vitistackv1alpha1.KubernetesCluster, existingCluster *armcontainerservice.ManagedCluster) bool {
+	if existingCluster == nil || existingCluster.Properties == nil {
+		return true
+	}
+
+	// Compare Kubernetes version
+	desiredVersion := m.getKubernetesVersion(kubernetesCluster)
+	if existingCluster.Properties.KubernetesVersion != nil {
+		currentVersion := *existingCluster.Properties.KubernetesVersion
+		if desiredVersion != currentVersion {
+			vlog.Info("Kubernetes version change detected",
+				"current", currentVersion,
+				"desired", desiredVersion,
+				"cluster", kubernetesCluster.Name)
+			return true
+		}
+	}
+
+	// Compare system node pool configuration
+	if kubernetesCluster.Spec.Topology.ControlPlane.Replicas > 0 && existingCluster.Properties.AgentPoolProfiles != nil {
+		desiredCount := int32(kubernetesCluster.Spec.Topology.ControlPlane.Replicas)
+		for _, pool := range existingCluster.Properties.AgentPoolProfiles {
+			if pool.Name != nil && *pool.Name == "system" {
+				if pool.Count != nil && *pool.Count != desiredCount {
+					vlog.Info("System node pool count change detected",
+						"current", *pool.Count,
+						"desired", desiredCount,
+						"cluster", kubernetesCluster.Name)
+					return true
+				}
+				// Compare VM size
+				desiredVMSize := m.resolveVMSize(ctx,
+					kubernetesCluster.Spec.Topology.ControlPlane.MachineClass,
+					kubernetesCluster.Spec.Cluster.Region,
+					interfaces.VMPurposeGeneralPurpose)
+				if pool.VMSize != nil && *pool.VMSize != desiredVMSize {
+					vlog.Info("System node pool VM size change detected",
+						"current", *pool.VMSize,
+						"desired", desiredVMSize,
+						"cluster", kubernetesCluster.Name)
+					return true
+				}
+				break
+			}
+		}
+	}
+
+	// Note: Worker node pool changes are handled separately by the AgentPoolManager
+	// This function focuses on cluster-level settings
+
+	return false
 }
 
 // determineNodePoolPurpose determines the preferred VM purpose for a node pool based on hints

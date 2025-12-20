@@ -100,8 +100,7 @@ func NewMachineClassMapper(k8sClient client.Client, vmSizeManager interfaces.VMS
 func (m *MachineClassMapperImpl) MapMachineClassToVMSize(ctx context.Context, machineClassName string, location string, preferredPurpose interfaces.VMPurpose) (*interfaces.MachineClassMapping, error) {
 	machineClass, err := m.GetMachineClass(ctx, machineClassName)
 	if err != nil {
-		// If MachineClass not found, try static mapping as fallback
-		vlog.Info("MachineClass not found, using static mapping", "machineClass", machineClassName)
+		// If MachineClass not found, use static mapping as fallback (no logging - this is expected)
 		return m.staticMapping(machineClassName, preferredPurpose), nil
 	}
 
@@ -256,7 +255,10 @@ func (m *MachineClassMapperImpl) ListMachineClasses(ctx context.Context) ([]*vit
 	}
 
 	m.cache.set(allClasses)
-	vlog.Info("Refreshed MachineClass cache", "total", len(allClasses), "enabled", len(enabledClasses))
+	// Only log if there are actually MachineClasses configured
+	if len(allClasses) > 0 {
+		vlog.Info("Refreshed MachineClass cache", "total", len(allClasses), "enabled", len(enabledClasses))
+	}
 
 	return enabledClasses, nil
 }

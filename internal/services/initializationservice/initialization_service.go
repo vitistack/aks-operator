@@ -63,13 +63,23 @@ func CheckAzureEnvironment() error {
 		return fmt.Errorf("missing required Azure environment variables: %v", missing)
 	}
 
-	// Check for authentication - either managed identity or service principal
-	hasClientCredentials := os.Getenv(consts.AZURE_OBJECT_ID) != "" && os.Getenv(consts.AZURE_CLIENT_SECRET) != ""
+	// Check for authentication - either service principal or managed identity
+	// Support both AZURE_CLIENT_ID (preferred) and AZURE_OBJECT_ID (deprecated)
+	clientID := os.Getenv(consts.AZURE_CLIENT_ID)
+	if clientID == "" {
+		clientID = os.Getenv(consts.AZURE_OBJECT_ID) // Fallback to deprecated
+	}
+	clientSecret := os.Getenv(consts.AZURE_CLIENT_SECRET)
+	tenantID := os.Getenv(consts.AZURE_TENANT_ID)
+	hasClientCredentials := clientID != "" && clientSecret != ""
 	hasManagedIdentity := os.Getenv("AZURE_CLIENT_ID") != "" || os.Getenv("AZURE_FEDERATED_TOKEN_FILE") != ""
 
 	if !hasClientCredentials && !hasManagedIdentity {
 		vlog.Info("No explicit Azure credentials found, will use DefaultAzureCredential (managed identity, CLI, etc.)")
 	} else if hasClientCredentials {
+		if tenantID == "" {
+			return fmt.Errorf("AZURE_TENANT_ID is required when using service principal authentication (AZURE_CLIENT_ID + AZURE_CLIENT_SECRET)")
+		}
 		vlog.Info("Using service principal authentication")
 	} else {
 		vlog.Info("Using managed identity or workload identity authentication")

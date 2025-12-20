@@ -46,7 +46,7 @@ func NewAgentPoolManager(agentPoolClient interfaces.AgentPoolClient, vmSizeManag
 
 // CreateAgentPool creates an agent pool from NodePool spec
 func (m *AgentPoolManagerImpl) CreateAgentPool(ctx context.Context, kubernetesCluster *vitistackv1alpha1.KubernetesCluster, nodePool vitistackv1alpha1.KubernetesClusterNodePool) (*armcontainerservice.AgentPool, error) {
-	vlog.Info("Creating agent pool", "cluster", kubernetesCluster.Name, "nodePool", nodePool.Name)
+	vlog.Info("Creating agent pool", "cluster", kubernetesCluster.Name, "nodePool", nodePool.Name, "clusterid", kubernetesCluster.Spec.Cluster.ClusterId)
 
 	resourceGroupName := m.getResourceGroupName(kubernetesCluster)
 	clusterName := m.getClusterName(kubernetesCluster)
@@ -56,7 +56,7 @@ func (m *AgentPoolManagerImpl) CreateAgentPool(ctx context.Context, kubernetesCl
 	if m.vmSizeManager != nil {
 		valid, err := m.vmSizeManager.ValidateVMSize(ctx, location, vmSize)
 		if err != nil {
-			vlog.Error(err, "failed to validate VM size", "vmSize", vmSize, "location", location)
+			vlog.Error(err, "failed to validate VM size", "vmSize", vmSize, "location", location, "clusterid", kubernetesCluster.Spec.Cluster.ClusterId)
 		} else if !valid {
 			return nil, fmt.Errorf("VM size %s is not available in location %s", vmSize, location)
 		}
@@ -69,13 +69,13 @@ func (m *AgentPoolManagerImpl) CreateAgentPool(ctx context.Context, kubernetesCl
 		return nil, fmt.Errorf("failed to create agent pool: %w", err)
 	}
 
-	vlog.Info("Agent pool created successfully", "cluster", clusterName, "nodePool", nodePool.Name, "id", *result.ID)
+	vlog.Info("Agent pool created successfully", "cluster", clusterName, "nodePool", nodePool.Name, "id", *result.ID, "clusterid", kubernetesCluster.Spec.Cluster.ClusterId)
 	return result, nil
 }
 
 // UpdateAgentPool updates an existing agent pool
 func (m *AgentPoolManagerImpl) UpdateAgentPool(ctx context.Context, kubernetesCluster *vitistackv1alpha1.KubernetesCluster, nodePool vitistackv1alpha1.KubernetesClusterNodePool) (*armcontainerservice.AgentPool, error) {
-	vlog.Info("Updating agent pool", "cluster", kubernetesCluster.Name, "nodePool", nodePool.Name)
+	vlog.Info("Updating agent pool", "cluster", kubernetesCluster.Name, "nodePool", nodePool.Name, "clusterid", kubernetesCluster.Spec.Cluster.ClusterId)
 
 	resourceGroupName := m.getResourceGroupName(kubernetesCluster)
 	clusterName := m.getClusterName(kubernetesCluster)
@@ -89,13 +89,13 @@ func (m *AgentPoolManagerImpl) UpdateAgentPool(ctx context.Context, kubernetesCl
 		return nil, fmt.Errorf("failed to update agent pool: %w", err)
 	}
 
-	vlog.Info("Agent pool updated successfully", "cluster", clusterName, "nodePool", nodePool.Name)
+	vlog.Info("Agent pool updated successfully", "cluster", clusterName, "nodePool", nodePool.Name, "clusterid", kubernetesCluster.Spec.Cluster.ClusterId)
 	return result, nil
 }
 
 // DeleteAgentPool deletes an agent pool
 func (m *AgentPoolManagerImpl) DeleteAgentPool(ctx context.Context, kubernetesCluster *vitistackv1alpha1.KubernetesCluster, nodePoolName string) error {
-	vlog.Info("Deleting agent pool", "cluster", kubernetesCluster.Name, "nodePool", nodePoolName)
+	vlog.Info("Deleting agent pool", "cluster", kubernetesCluster.Name, "nodePool", nodePoolName, "clusterid", kubernetesCluster.Spec.Cluster.ClusterId)
 
 	resourceGroupName := m.getResourceGroupName(kubernetesCluster)
 	clusterName := m.getClusterName(kubernetesCluster)
@@ -105,7 +105,7 @@ func (m *AgentPoolManagerImpl) DeleteAgentPool(ctx context.Context, kubernetesCl
 		return fmt.Errorf("failed to delete agent pool: %w", err)
 	}
 
-	vlog.Info("Agent pool deleted successfully", "cluster", clusterName, "nodePool", nodePoolName)
+	vlog.Info("Agent pool deleted successfully", "cluster", clusterName, "nodePool", nodePoolName, "clusterid", kubernetesCluster.Spec.Cluster.ClusterId)
 	return nil
 }
 
@@ -137,7 +137,7 @@ func (m *AgentPoolManagerImpl) ListAgentPools(ctx context.Context, kubernetesClu
 
 // ReconcileAgentPools reconciles all agent pools for a cluster
 func (m *AgentPoolManagerImpl) ReconcileAgentPools(ctx context.Context, kubernetesCluster *vitistackv1alpha1.KubernetesCluster) error {
-	vlog.Info("Reconciling agent pools", "cluster", kubernetesCluster.Name)
+	vlog.Info("Reconciling agent pools", "cluster", kubernetesCluster.Name, "clusterid", kubernetesCluster.Spec.Cluster.ClusterId)
 
 	existingPools, err := m.ListAgentPools(ctx, kubernetesCluster)
 	if err != nil {
@@ -163,11 +163,11 @@ func (m *AgentPoolManagerImpl) ReconcileAgentPools(ctx context.Context, kubernet
 
 		if _, exists := existingPoolMap[nodePool.Name]; exists {
 			if _, err := m.UpdateAgentPool(ctx, kubernetesCluster, nodePool); err != nil {
-				vlog.Error(err, "failed to update agent pool", "nodePool", nodePool.Name)
+				vlog.Error(err, "failed to update agent pool", "nodePool", nodePool.Name, "clusterid", kubernetesCluster.Spec.Cluster.ClusterId)
 			}
 		} else {
 			if _, err := m.CreateAgentPool(ctx, kubernetesCluster, nodePool); err != nil {
-				vlog.Error(err, "failed to create agent pool", "nodePool", nodePool.Name)
+				vlog.Error(err, "failed to create agent pool", "nodePool", nodePool.Name, "clusterid", kubernetesCluster.Spec.Cluster.ClusterId)
 			}
 		}
 	}
@@ -175,12 +175,12 @@ func (m *AgentPoolManagerImpl) ReconcileAgentPools(ctx context.Context, kubernet
 	for poolName := range existingPoolMap {
 		if !desiredPoolNames[poolName] && poolName != "system" {
 			if err := m.DeleteAgentPool(ctx, kubernetesCluster, poolName); err != nil {
-				vlog.Error(err, "failed to delete agent pool", "nodePool", poolName)
+				vlog.Error(err, "failed to delete agent pool", "nodePool", poolName, "clusterid", kubernetesCluster.Spec.Cluster.ClusterId)
 			}
 		}
 	}
 
-	vlog.Info("Agent pools reconciled successfully", "cluster", kubernetesCluster.Name)
+	vlog.Info("Agent pools reconciled successfully", "cluster", kubernetesCluster.Name, "clusterid", kubernetesCluster.Spec.Cluster.ClusterId)
 	return nil
 }
 
@@ -240,7 +240,7 @@ func (m *AgentPoolManagerImpl) getResourceGroupName(kubernetesCluster *vitistack
 }
 
 func (m *AgentPoolManagerImpl) getClusterName(kubernetesCluster *vitistackv1alpha1.KubernetesCluster) string {
-	return fmt.Sprintf("aks-%s-%s", kubernetesCluster.Namespace, kubernetesCluster.Name)
+	return kubernetesCluster.Spec.Cluster.ClusterId
 }
 
 // resolveVMSize resolves a MachineClass name to an Azure VM size using the mapper

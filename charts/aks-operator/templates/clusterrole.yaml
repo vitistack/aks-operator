@@ -6,6 +6,19 @@ metadata:
   labels:
     {{- include "aks-operator.labels" . | nindent 4 }}
 rules:
+  # Secrets for cluster state tracking
+  - apiGroups:
+      - ""
+    resources:
+      - secrets
+    verbs:
+      - create
+      - delete
+      - get
+      - list
+      - patch
+      - update
+      - watch
   # KubernetesCluster resources
   - apiGroups:
       - vitistack.io

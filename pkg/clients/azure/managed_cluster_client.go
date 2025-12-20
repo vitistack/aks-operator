@@ -19,8 +19,11 @@ package azure
 import (
 	"context"
 	"fmt"
+	"time"
 
+	"github.com/Azure/azure-sdk-for-go/sdk/azcore/runtime"
 	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/containerservice/armcontainerservice/v6"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 // ManagedClusterClientImpl implements the ManagedClusterClient interface
@@ -28,10 +31,80 @@ type ManagedClusterClientImpl struct {
 	client *armcontainerservice.ManagedClustersClient
 }
 
+// Polling configuration for long-running operations
+const (
+	// pollInterval is how often to poll Azure for operation status
+	pollInterval = 30 * time.Second
+	// logInterval is how often to log progress messages
+	logInterval = 60 * time.Second
+)
+
 // NewManagedClusterClientImpl creates a new ManagedClusterClientImpl
 func NewManagedClusterClientImpl(client *armcontainerservice.ManagedClustersClient) *ManagedClusterClientImpl {
 	return &ManagedClusterClientImpl{
 		client: client,
+	}
+}
+
+// pollWithLogging polls a long-running operation with periodic logging
+func pollWithLogging[T any](ctx context.Context, poller *runtime.Poller[T], operation, resourceName string) (T, error) {
+	logger := log.FromContext(ctx)
+	startTime := time.Now()
+	lastLogTime := startTime
+
+	logger.Info("Starting long-running Azure operation",
+		"operation", operation,
+		"resource", resourceName)
+
+	for {
+		// Check if context is cancelled
+		select {
+		case <-ctx.Done():
+			var zero T
+			return zero, ctx.Err()
+		default:
+		}
+
+		// Poll for completion
+		resp, err := poller.Poll(ctx)
+		if err != nil {
+			var zero T
+			return zero, fmt.Errorf("polling failed: %w", err)
+		}
+
+		elapsed := time.Since(startTime).Round(time.Second)
+
+		if poller.Done() {
+			logger.Info("Azure operation completed",
+				"operation", operation,
+				"resource", resourceName,
+				"duration", elapsed.String())
+
+			result, err := poller.Result(ctx)
+			if err != nil {
+				var zero T
+				return zero, fmt.Errorf("failed to get operation result: %w", err)
+			}
+			return result, nil
+		}
+
+		// Log progress periodically
+		if time.Since(lastLogTime) >= logInterval {
+			logger.Info("Azure operation in progress, waiting...",
+				"operation", operation,
+				"resource", resourceName,
+				"elapsed", elapsed.String(),
+				"status", resp.Status)
+			lastLogTime = time.Now()
+		}
+
+		// Wait before next poll
+		select {
+		case <-ctx.Done():
+			var zero T
+			return zero, ctx.Err()
+		case <-time.After(pollInterval):
+		}
 	}
 }
 
@@ -46,7 +119,7 @@ func (c *ManagedClusterClientImpl) CreateOrUpdate(
 		return nil, fmt.Errorf("failed to begin create/update managed cluster: %w", err)
 	}
 
-	resp, err := poller.PollUntilDone(ctx, nil)
+	resp, err := pollWithLogging(ctx, poller, "CreateOrUpdate", clusterName)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create/update managed cluster: %w", err)
 	}
@@ -74,7 +147,7 @@ func (c *ManagedClusterClientImpl) Delete(ctx context.Context, resourceGroupName
 		return fmt.Errorf("failed to begin delete managed cluster: %w", err)
 	}
 
-	_, err = poller.PollUntilDone(ctx, nil)
+	_, err = pollWithLogging(ctx, poller, "Delete", clusterName)
 	if err != nil {
 		return fmt.Errorf("failed to delete managed cluster: %w", err)
 	}

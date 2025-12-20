@@ -11,8 +11,11 @@ var (
 
 	// Azure related environment variables
 	AZURE_SUBSCRIPTION_ID       = "AZURE_SUBSCRIPTION_ID"
-	AZURE_OBJECT_ID             = "AZURE_OBJECT_ID"
+	AZURE_TENANT_ID             = "AZURE_TENANT_ID"
+	AZURE_CLIENT_ID             = "AZURE_CLIENT_ID"
+	AZURE_OBJECT_ID             = "AZURE_OBJECT_ID"     // Deprecated: use AZURE_CLIENT_ID instead
 	AZURE_CLIENT_SECRET         = "AZURE_CLIENT_SECRET" // #nosec G101 -- not a credential, just env var name
+	AZURE_SECRET_ID             = "AZURE_SECRET_ID"     // Optional: ID of the secret in Azure AD (for tracking which secret is in use)
 	AZURE_VALIDATE_CONNECTIVITY = "AZURE_VALIDATE_CONNECTIVITY"
 	AZURE_DEFAULT_LOCATION      = "AZURE_DEFAULT_LOCATION"
 
