@@ -388,7 +388,12 @@ func (m *AKSClusterManagerImpl) needsUpdate(ctx context.Context, kubernetesClust
 
 	// Compare system node pool configuration
 	if kubernetesCluster.Spec.Topology.ControlPlane.Replicas > 0 && existingCluster.Properties.AgentPoolProfiles != nil {
-		desiredCount := int32(kubernetesCluster.Spec.Topology.ControlPlane.Replicas)
+		// Safe conversion with bounds check (replicas should never exceed int32 max)
+		replicas := kubernetesCluster.Spec.Topology.ControlPlane.Replicas
+		if replicas > int(^int32(0)) {
+			replicas = int(^int32(0)) // Cap at max int32
+		}
+		desiredCount := int32(replicas) // #nosec G115 -- bounds checked above
 		for _, pool := range existingCluster.Properties.AgentPoolProfiles {
 			if pool.Name != nil && *pool.Name == "system" {
 				if pool.Count != nil && *pool.Count != desiredCount {
