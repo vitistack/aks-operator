@@ -30,7 +30,9 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	"sigs.k8s.io/controller-runtime/pkg/event"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
 )
 
 const (
@@ -72,12 +74,6 @@ func (r *KubernetesClusterReconciler) Reconcile(ctx context.Context, req ctrl.Re
 	kubernetesCluster := &vitistackv1alpha1.KubernetesCluster{}
 	if err := r.Get(ctx, req.NamespacedName, kubernetesCluster); err != nil {
 		return ctrl.Result{}, client.IgnoreNotFound(err)
-	}
-
-	// Only reconcile clusters with spec.cluster.provider == "aks"
-	if !r.isAKSProvider(kubernetesCluster) {
-		vlog.Info("Skipping KubernetesCluster: unsupported provider (need 'aks')", "cluster", kubernetesCluster.GetName())
-		return ctrl.Result{}, nil
 	}
 
 	// Verify Azure services are initialized (they should be from main.go)
@@ -245,8 +241,41 @@ func (r *KubernetesClusterReconciler) updateClusterStatus(ctx context.Context, k
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *KubernetesClusterReconciler) SetupWithManager(mgr ctrl.Manager) error {
+	// Filter to only process KubernetesClusters with provider == "aks"
+	aksProviderPredicate := predicate.Funcs{
+		CreateFunc: func(e event.CreateEvent) bool {
+			cluster, ok := e.Object.(*vitistackv1alpha1.KubernetesCluster)
+			if !ok {
+				return false
+			}
+			return cluster.Spec.Cluster.Provider == vitistackv1alpha1.KubernetesProviderTypeAKS
+		},
+		UpdateFunc: func(e event.UpdateEvent) bool {
+			cluster, ok := e.ObjectNew.(*vitistackv1alpha1.KubernetesCluster)
+			if !ok {
+				return false
+			}
+			return cluster.Spec.Cluster.Provider == vitistackv1alpha1.KubernetesProviderTypeAKS
+		},
+		DeleteFunc: func(e event.DeleteEvent) bool {
+			cluster, ok := e.Object.(*vitistackv1alpha1.KubernetesCluster)
+			if !ok {
+				return false
+			}
+			return cluster.Spec.Cluster.Provider == vitistackv1alpha1.KubernetesProviderTypeAKS
+		},
+		GenericFunc: func(e event.GenericEvent) bool {
+			cluster, ok := e.Object.(*vitistackv1alpha1.KubernetesCluster)
+			if !ok {
+				return false
+			}
+			return cluster.Spec.Cluster.Provider == vitistackv1alpha1.KubernetesProviderTypeAKS
+		},
+	}
+
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&vitistackv1alpha1.KubernetesCluster{}).
+		WithEventFilter(aksProviderPredicate).
 		Named("kubernetescluster").
 		Complete(r)
 }

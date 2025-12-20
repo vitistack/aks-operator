@@ -143,7 +143,7 @@ func ValidateAzureConnectivity(ctx context.Context, services *AzureServices) err
 		return fmt.Errorf("azure connectivity check failed: %w", err)
 	}
 
-	vlog.Info("✅ Azure connectivity validated", "testLocation", testLocation)
+	vlog.Info("✅ Azure connectivity validated", " testLocation: ", testLocation)
 	return nil
 }
 

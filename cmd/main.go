@@ -43,6 +43,7 @@ import (
 	"github.com/vitistack/aks-operator/internal/settings"
 	"github.com/vitistack/common/pkg/clients/k8sclient"
 	"github.com/vitistack/common/pkg/loggers/vlog"
+	vitistackv1alpha1 "github.com/vitistack/common/pkg/v1alpha1"
 
 	// +kubebuilder:scaffold:imports
 	"github.com/vitistack/aks-operator/internal/consts"
@@ -55,6 +56,7 @@ var (
 
 func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
+	utilruntime.Must(vitistackv1alpha1.AddToScheme(scheme))
 
 	// +kubebuilder:scaffold:scheme
 }

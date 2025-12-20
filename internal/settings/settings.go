@@ -16,6 +16,7 @@ func Init() {
 	viper.SetDefault(consts.TENANT_CONFIGMAP_NAMESPACE, "default")
 	viper.SetDefault(consts.TENANT_CONFIGMAP_DATA_KEY, "config.yaml")
 	viper.SetDefault(consts.DEFAULT_KUBERNETES_VERSION, "1.34.1")
+	viper.SetDefault(consts.AZURE_VALIDATE_CONNECTIVITY, true)
 
 	dotenv.LoadDotEnv()
 	viper.AutomaticEnv()
