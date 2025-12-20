@@ -31,6 +31,17 @@ serviceAccount:
   # If not set and create is true, a name is generated using the fullname template.
   name: ""
 
+# RBAC configuration
+rbac:
+  # Specifies whether RBAC resources should be created.
+  create: true
+
+# Leader election configuration
+leaderElection:
+  # Enable leader election for controller manager.
+  # Enabling this will ensure there is only one active controller manager.
+  enabled: false
+
 # This is for setting Kubernetes Annotations to a Pod.
 # For more information checkout: https://kubernetes.io/docs/concepts/overview/working-with-objects/annotations/
 podAnnotations: {}
@@ -135,7 +146,7 @@ livenessProbe:
     port: 9995
 readinessProbe:
   httpGet:
-    path: /healthz
+    path: /readyz
     port: 9995
 
 # This section is for setting up autoscaling more information can be found here: https://kubernetes.io/docs/concepts/workloads/autoscaling/
