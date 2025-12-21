@@ -43,6 +43,85 @@ make run
 
 See [Azure Authentication Guide](docs/azure-authentication.md) for detailed setup instructions.
 
+## Installation
+
+### Helm Chart
+
+The operator is available as an OCI Helm chart from GitHub Container Registry.
+
+```bash
+# Login to GitHub Container Registry
+helm registry login ghcr.io
+
+# Install the operator
+helm install aks-operator oci://ghcr.io/vitistack/helm/aks-operator \
+  --namespace vitistack \
+  --create-namespace
+```
+
+#### With Azure Service Principal (Using Existing Secret)
+
+```bash
+# Create a secret with Azure credentials
+kubectl create namespace vitistack
+
+kubectl create secret generic azure-credentials \
+  --namespace vitistack \
+  --from-literal=AZURE_SUBSCRIPTION_ID=<subscription-id> \
+  --from-literal=AZURE_TENANT_ID=<tenant-id> \
+  --from-literal=AZURE_CLIENT_ID=<client-id> \
+  --from-literal=AZURE_CLIENT_SECRET=<client-secret>
+
+# Install the operator referencing the existing secret
+helm install aks-operator oci://ghcr.io/vitistack/helm/aks-operator \
+  --namespace vitistack \
+  --set azure.existingSecret=azure-credentials
+```
+
+#### With Azure Credentials in Values
+
+```bash
+# Install with credentials directly (not recommended for production)
+helm install aks-operator oci://ghcr.io/vitistack/helm/aks-operator \
+  --namespace vitistack \
+  --create-namespace \
+  --set azure.subscriptionId=<subscription-id> \
+  --set azure.tenantId=<tenant-id> \
+  --set azure.clientId=<client-id> \
+  --set azure.clientSecret=<client-secret>
+```
+
+#### From Local Chart
+
+```bash
+helm install aks-operator ./charts/aks-operator \
+  --namespace vitistack \
+  --create-namespace
+```
+
+#### Configuration
+
+| Parameter | Description | Default |
+|-----------|-------------|---------|
+| `replicaCount` | Number of replicas | `1` |
+| `image.repository` | Image repository | `ghcr.io/vitistack/viti-aks-operator` |
+| `image.tag` | Image tag | `""` (uses chart appVersion) |
+| `image.pullPolicy` | Image pull policy | `IfNotPresent` |
+| `serviceAccount.create` | Create service account | `true` |
+| `rbac.create` | Create RBAC resources | `true` |
+| `leaderElection.enabled` | Enable leader election | `false` |
+| `azure.existingSecret` | Name of existing secret with Azure credentials | `""` |
+| `azure.subscriptionId` | Azure Subscription ID | `""` |
+| `azure.tenantId` | Azure Tenant ID | `""` |
+| `azure.clientId` | Azure Client ID (Service Principal) | `""` |
+| `azure.clientSecret` | Azure Client Secret | `""` |
+| `env` | Additional environment variables | `[]` |
+| `envFrom` | Additional envFrom sources | `[]` |
+| `resources.limits.cpu` | CPU limit | `100m` |
+| `resources.limits.memory` | Memory limit | `128Mi` |
+
+See [values.yaml](charts/aks-operator/values.yaml) for all available options.
+
 ## Azure Resource Groups
 
 The `spec.data.project` field maps to the Azure Resource Group name:

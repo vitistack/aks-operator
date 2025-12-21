@@ -42,6 +42,39 @@ leaderElection:
   # Enabling this will ensure there is only one active controller manager.
   enabled: false
 
+# Azure credentials configuration
+# You can either set the credentials directly or use an existing secret
+azure:
+  # Use an existing secret containing Azure credentials
+  # The secret should contain: AZURE_SUBSCRIPTION_ID, AZURE_TENANT_ID, AZURE_CLIENT_ID, AZURE_CLIENT_SECRET
+  existingSecret: ""
+  # Or set credentials directly (not recommended for production)
+  subscriptionId: ""
+  tenantId: ""
+  clientId: ""
+  clientSecret: ""
+
+# Additional environment variables to set on the container
+# Example:
+# env:
+#   - name: LOG_LEVEL
+#     value: "debug"
+#   - name: MY_VAR
+#     valueFrom:
+#       secretKeyRef:
+#         name: my-secret
+#         key: my-key
+env: []
+
+# Additional envFrom sources to set on the container
+# Example:
+# envFrom:
+#   - secretRef:
+#       name: my-secret
+#   - configMapRef:
+#       name: my-configmap
+envFrom: []
+
 # This is for setting Kubernetes Annotations to a Pod.
 # For more information checkout: https://kubernetes.io/docs/concepts/overview/working-with-objects/annotations/
 podAnnotations: {}

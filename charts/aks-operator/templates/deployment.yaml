@@ -40,6 +40,38 @@ spec:
           {{- end }}
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
+          {{- if or .Values.azure.existingSecret .Values.azure.subscriptionId .Values.env }}
+          env:
+            {{- if .Values.azure.subscriptionId }}
+            - name: AZURE_SUBSCRIPTION_ID
+              value: {{ .Values.azure.subscriptionId | quote }}
+            {{- end }}
+            {{- if .Values.azure.tenantId }}
+            - name: AZURE_TENANT_ID
+              value: {{ .Values.azure.tenantId | quote }}
+            {{- end }}
+            {{- if .Values.azure.clientId }}
+            - name: AZURE_CLIENT_ID
+              value: {{ .Values.azure.clientId | quote }}
+            {{- end }}
+            {{- if .Values.azure.clientSecret }}
+            - name: AZURE_CLIENT_SECRET
+              value: {{ .Values.azure.clientSecret | quote }}
+            {{- end }}
+            {{- with .Values.env }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          {{- end }}
+          {{- if or .Values.azure.existingSecret .Values.envFrom }}
+          envFrom:
+            {{- if .Values.azure.existingSecret }}
+            - secretRef:
+                name: {{ .Values.azure.existingSecret }}
+            {{- end }}
+            {{- with .Values.envFrom }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          {{- end }}
           ports:
             - name: http
               containerPort: {{ .Values.service.port }}
