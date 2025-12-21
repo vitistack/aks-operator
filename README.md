@@ -13,13 +13,17 @@ Vitistack Kubernetes provider for AKS (Azure Kubernetes Service)
 
 The operator requires Azure credentials to manage AKS clusters. Choose your authentication method:
 
-| Method                                                         | Best For          | Admin Required      |
-| -------------------------------------------------------------- | ----------------- | ------------------- |
-| [User Credentials (Azure CLI)](docs/azure-user-credentials.md) | Local development | No                  |
-| [Service Principal](docs/azure-service-principal.md)           | Production, CI/CD | Yes (initial setup) |
-| [Workload Identity](docs/azure-workload-identity.md)           | Running in AKS    | Yes                 |
+| Method                                                         | Best For              | Admin Required      | Works in Cluster? |
+| -------------------------------------------------------------- | --------------------- | ------------------- | ----------------- |
+| [User Credentials (Azure CLI)](docs/azure-user-credentials.md) | Local development     | No                  | ❌ No             |
+| [Service Principal](docs/azure-service-principal.md)           | Production, CI/CD     | Yes (initial setup) | ✅ Yes            |
+| [Workload Identity](docs/azure-workload-identity.md)           | Running in AKS        | Yes                 | ✅ Yes            |
+| Managed Identity                                               | Azure VMs/VMSS nodes  | Yes                 | ✅ Yes            |
 
-### Quick Start
+> **Important:** User credentials (Azure CLI) only work when running the operator locally with `make run`.
+> To deploy the operator in a Kubernetes cluster, you **must** use Service Principal, Workload Identity, or Managed Identity.
+
+### Quick Start (Local Development)
 
 **Option 1: User Credentials (Easiest for local development)**
 
@@ -49,19 +53,18 @@ See [Azure Authentication Guide](docs/azure-authentication.md) for detailed setu
 
 The operator is available as an OCI Helm chart from GitHub Container Registry.
 
+> **⚠️ Authentication Required:** The operator requires Azure credentials to function.
+> User credentials (Azure CLI) do **not** work in a cluster - you must configure one of:
+> - Service Principal (recommended)
+> - Workload Identity (for AKS clusters)
+> - Managed Identity (for Azure VM/VMSS nodes)
+
+#### With Azure Service Principal (Recommended)
+
 ```bash
 # Login to GitHub Container Registry
 helm registry login ghcr.io
 
-# Install the operator
-helm install aks-operator oci://ghcr.io/vitistack/helm/aks-operator \
-  --namespace vitistack \
-  --create-namespace
-```
-
-#### With Azure Service Principal (Using Existing Secret)
-
-```bash
 # Create a secret with Azure credentials
 kubectl create namespace vitistack
 
@@ -77,6 +80,20 @@ helm install aks-operator oci://ghcr.io/vitistack/helm/aks-operator \
   --namespace vitistack \
   --set azure.existingSecret=azure-credentials
 ```
+
+#### With Workload Identity (AKS)
+
+If your AKS cluster has Workload Identity enabled:
+
+```bash
+helm install aks-operator oci://ghcr.io/vitistack/helm/aks-operator \
+  --namespace vitistack \
+  --create-namespace \
+  --set azure.subscriptionId=<subscription-id> \
+  --set "serviceAccount.annotations.azure\.workload\.identity/client-id=<managed-identity-client-id>"
+```
+
+See [Workload Identity Guide](docs/azure-workload-identity.md) for setup instructions.
 
 #### With Azure Credentials in Values
 
