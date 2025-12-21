@@ -27,10 +27,9 @@ jobs:
           - platform: linux/amd64
             arch: amd64
             runner: ubuntu-latest
-          # ARM64 build commented out - requires GitHub ARM runners (not available on public repos free tier)
-          # - platform: linux/arm64
-          #   arch: arm64
-          #   runner: ubuntu-24.04-arm
+          - platform: linux/arm64
+            arch: arm64
+            runner: ubuntu-24.04-arm
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
