@@ -19,6 +19,14 @@ rules:
       - patch
       - update
       - watch
+  # Events for controller event recording
+  - apiGroups:
+      - ""
+    resources:
+      - events
+    verbs:
+      - create
+      - patch
   # KubernetesCluster resources
   - apiGroups:
       - vitistack.io
