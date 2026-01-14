@@ -92,6 +92,31 @@ func (s *ClusterStateService) GetOrCreateState(ctx context.Context, cluster *vit
 	return secret, nil
 }
 
+// getStateWithRetry gets the cluster state secret with retry for cache consistency
+// This is useful after create/update operations where the cache might be stale
+func (s *ClusterStateService) getStateWithRetry(ctx context.Context, cluster *vitistackv1alpha1.KubernetesCluster) (*corev1.Secret, error) {
+	secretName := cluster.Spec.Cluster.ClusterId
+	namespace := cluster.Namespace
+
+	var secret *corev1.Secret
+	var err error
+
+	// Try up to 3 times with a small delay to handle cache inconsistency
+	for range 3 {
+		secret, err = s.secretService.GetSecret(ctx, secretName, namespace)
+		if err == nil {
+			return secret, nil
+		}
+		if !apierrors.IsNotFound(err) {
+			return nil, err
+		}
+		// Small delay before retry for cache to sync
+		time.Sleep(100 * time.Millisecond)
+	}
+
+	return nil, err
+}
+
 // createStateSecret creates a new state secret for the cluster
 func (s *ClusterStateService) createStateSecret(ctx context.Context, cluster *vitistackv1alpha1.KubernetesCluster) (*corev1.Secret, error) {
 	secretName := cluster.Spec.Cluster.ClusterId
@@ -128,44 +153,83 @@ func (s *ClusterStateService) createStateSecret(ctx context.Context, cluster *vi
 	}
 
 	if err := s.client.Create(ctx, secret); err != nil {
+		// If secret already exists (race condition), fetch and return it
+		if apierrors.IsAlreadyExists(err) {
+			vlog.Info("State secret already exists, fetching it", "cluster", cluster.Name, "secret", secretName)
+			return s.getStateWithRetry(ctx, cluster)
+		}
 		return nil, err
 	}
 
 	vlog.Info("Created cluster state secret", "cluster", cluster.Name, "secret", secretName)
-	return secret, nil
+
+	// Re-fetch the secret to get the correct ResourceVersion for subsequent updates
+	return s.getStateWithRetry(ctx, cluster)
 }
 
 // UpdateState updates a specific key in the state secret
 func (s *ClusterStateService) UpdateState(ctx context.Context, cluster *vitistackv1alpha1.KubernetesCluster, key, value string) error {
-	secret, err := s.GetOrCreateState(ctx, cluster)
-	if err != nil {
+	// Retry up to 3 times to handle conflicts from stale ResourceVersion
+	var lastErr error
+	for range 3 {
+		secret, err := s.GetOrCreateState(ctx, cluster)
+		if err != nil {
+			return err
+		}
+
+		if secret.Data == nil {
+			secret.Data = make(map[string][]byte)
+		}
+		secret.Data[key] = []byte(value)
+
+		err = s.secretService.UpdateSecret(ctx, secret)
+		if err == nil {
+			return nil
+		}
+		lastErr = err
+
+		// If conflict, retry with fresh secret
+		if apierrors.IsConflict(err) || apierrors.IsNotFound(err) {
+			time.Sleep(100 * time.Millisecond)
+			continue
+		}
 		return err
 	}
-
-	if secret.Data == nil {
-		secret.Data = make(map[string][]byte)
-	}
-	secret.Data[key] = []byte(value)
-
-	return s.secretService.UpdateSecret(ctx, secret)
+	return lastErr
 }
 
 // UpdateStateMultiple updates multiple keys in the state secret
 func (s *ClusterStateService) UpdateStateMultiple(ctx context.Context, cluster *vitistackv1alpha1.KubernetesCluster, updates map[string]string) error {
-	secret, err := s.GetOrCreateState(ctx, cluster)
-	if err != nil {
+	// Retry up to 3 times to handle conflicts from stale ResourceVersion
+	var lastErr error
+	for range 3 {
+		secret, err := s.GetOrCreateState(ctx, cluster)
+		if err != nil {
+			return err
+		}
+
+		if secret.Data == nil {
+			secret.Data = make(map[string][]byte)
+		}
+
+		for key, value := range updates {
+			secret.Data[key] = []byte(value)
+		}
+
+		err = s.secretService.UpdateSecret(ctx, secret)
+		if err == nil {
+			return nil
+		}
+		lastErr = err
+
+		// If conflict, retry with fresh secret
+		if apierrors.IsConflict(err) || apierrors.IsNotFound(err) {
+			time.Sleep(100 * time.Millisecond)
+			continue
+		}
 		return err
 	}
-
-	if secret.Data == nil {
-		secret.Data = make(map[string][]byte)
-	}
-
-	for key, value := range updates {
-		secret.Data[key] = []byte(value)
-	}
-
-	return s.secretService.UpdateSecret(ctx, secret)
+	return lastErr
 }
 
 // GetState retrieves a specific key from the state secret
@@ -263,18 +327,34 @@ func (s *ClusterStateService) SetClusterReady(ctx context.Context, cluster *viti
 
 // SetKubeconfig stores the kubeconfig in the state secret
 func (s *ClusterStateService) SetKubeconfig(ctx context.Context, cluster *vitistackv1alpha1.KubernetesCluster, kubeconfig []byte) error {
-	secret, err := s.GetOrCreateState(ctx, cluster)
-	if err != nil {
+	// Retry up to 3 times to handle conflicts from stale ResourceVersion
+	var lastErr error
+	for range 3 {
+		secret, err := s.GetOrCreateState(ctx, cluster)
+		if err != nil {
+			return err
+		}
+
+		if secret.Data == nil {
+			secret.Data = make(map[string][]byte)
+		}
+		secret.Data[KeyKubeConfig] = kubeconfig
+		secret.Data[KeyKubeconfigPresent] = []byte("true")
+
+		err = s.secretService.UpdateSecret(ctx, secret)
+		if err == nil {
+			return nil
+		}
+		lastErr = err
+
+		// If conflict, retry with fresh secret
+		if apierrors.IsConflict(err) || apierrors.IsNotFound(err) {
+			time.Sleep(100 * time.Millisecond)
+			continue
+		}
 		return err
 	}
-
-	if secret.Data == nil {
-		secret.Data = make(map[string][]byte)
-	}
-	secret.Data[KeyKubeConfig] = kubeconfig
-	secret.Data[KeyKubeconfigPresent] = []byte("true")
-
-	return s.secretService.UpdateSecret(ctx, secret)
+	return lastErr
 }
 
 // GetKubeconfig retrieves the kubeconfig from the state secret
