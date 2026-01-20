@@ -142,15 +142,31 @@ func (c *ManagedClusterClientImpl) Get(
 
 // Delete deletes a managed cluster
 func (c *ManagedClusterClientImpl) Delete(ctx context.Context, resourceGroupName, clusterName string) error {
+	logger := log.FromContext(ctx)
+	logger.Info("🗑️ Starting Azure AKS deletion API call",
+		"resourceGroup", resourceGroupName,
+		"clusterName", clusterName)
+
 	poller, err := c.client.BeginDelete(ctx, resourceGroupName, clusterName, nil)
 	if err != nil {
+		logger.Error(err, "❌ Failed to begin delete managed cluster",
+			"resourceGroup", resourceGroupName,
+			"clusterName", clusterName)
 		return fmt.Errorf("failed to begin delete managed cluster: %w", err)
 	}
+
+	logger.Info("✅ Azure accepted delete request, polling for completion",
+		"resourceGroup", resourceGroupName,
+		"clusterName", clusterName)
 
 	_, err = pollWithLogging(ctx, poller, "Delete", clusterName)
 	if err != nil {
 		return fmt.Errorf("failed to delete managed cluster: %w", err)
 	}
+
+	logger.Info("🗑️ Azure AKS cluster deletion completed",
+		"resourceGroup", resourceGroupName,
+		"clusterName", clusterName)
 
 	return nil
 }

@@ -18,6 +18,7 @@ package clusterstate
 
 import (
 	"context"
+	"sync"
 	"time"
 
 	"github.com/vitistack/common/pkg/loggers/vlog"
@@ -57,6 +58,9 @@ const (
 	KeyAKSClusterFQDN      = "aks_cluster_fqdn"
 	KeyNodePoolsConfigured = "nodepools_configured"
 
+	// Guest cluster identifiers
+	KeyKubeSystemUID = "kube-system-uid"
+
 	// Label for the secret
 	LabelClusterID = "vitistack.io/clusterid"
 )
@@ -65,6 +69,7 @@ const (
 type ClusterStateService struct {
 	secretService *secretservice.SecretService
 	client        client.Client
+	creationLocks sync.Map // map[string]*sync.Mutex for per-secret creation locks
 }
 
 // NewClusterStateService creates a new ClusterStateService
@@ -75,21 +80,44 @@ func NewClusterStateService(c client.Client) *ClusterStateService {
 	}
 }
 
+// getCreationLock returns a mutex for the given secret name to prevent concurrent creation
+func (s *ClusterStateService) getCreationLock(secretName string) *sync.Mutex {
+	lock, _ := s.creationLocks.LoadOrStore(secretName, &sync.Mutex{})
+	return lock.(*sync.Mutex)
+}
+
 // GetOrCreateState gets or creates the cluster state secret
 func (s *ClusterStateService) GetOrCreateState(ctx context.Context, cluster *vitistackv1alpha1.KubernetesCluster) (*corev1.Secret, error) {
 	secretName := cluster.Spec.Cluster.ClusterId
 	namespace := cluster.Namespace
 
+	// Try to get existing secret first
 	secret, err := s.secretService.GetSecret(ctx, secretName, namespace)
-	if err != nil {
-		if apierrors.IsNotFound(err) {
-			// Create new state secret
-			return s.createStateSecret(ctx, cluster)
-		}
+	if err == nil {
+		return secret, nil
+	}
+
+	if !apierrors.IsNotFound(err) {
 		return nil, err
 	}
 
-	return secret, nil
+	// Secret not found - acquire lock to prevent concurrent creation
+	lock := s.getCreationLock(secretName)
+	lock.Lock()
+	defer lock.Unlock()
+
+	// Double-check after acquiring lock (another goroutine might have created it)
+	secret, err = s.secretService.GetSecret(ctx, secretName, namespace)
+	if err == nil {
+		return secret, nil
+	}
+
+	if !apierrors.IsNotFound(err) {
+		return nil, err
+	}
+
+	// Create new state secret
+	return s.createStateSecret(ctx, cluster)
 }
 
 // getStateWithRetry gets the cluster state secret with retry for cache consistency
@@ -405,4 +433,14 @@ func (s *ClusterStateService) DeleteState(ctx context.Context, cluster *vitistac
 
 	vlog.Info("Deleted cluster state secret", "cluster", cluster.Name, "secret", secretName)
 	return nil
+}
+
+// SetKubeSystemUID stores the kube-system namespace UID in the state secret
+func (s *ClusterStateService) SetKubeSystemUID(ctx context.Context, cluster *vitistackv1alpha1.KubernetesCluster, uid string) error {
+	return s.UpdateState(ctx, cluster, KeyKubeSystemUID, uid)
+}
+
+// GetKubeSystemUID retrieves the kube-system namespace UID from the state secret
+func (s *ClusterStateService) GetKubeSystemUID(ctx context.Context, cluster *vitistackv1alpha1.KubernetesCluster) (string, error) {
+	return s.GetState(ctx, cluster, KeyKubeSystemUID)
 }

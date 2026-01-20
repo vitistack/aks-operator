@@ -39,3 +39,6 @@ bin/
 
 __debug_bin*
 .DS_Store
+
+# SBOM output
+sbom/

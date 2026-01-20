@@ -39,6 +39,7 @@ import (
 
 	"github.com/spf13/viper"
 	"github.com/vitistack/aks-operator/internal/controller"
+	"github.com/vitistack/aks-operator/internal/services/clusterstate"
 	"github.com/vitistack/aks-operator/internal/services/initializationservice"
 	"github.com/vitistack/aks-operator/internal/settings"
 	"github.com/vitistack/common/pkg/clients/k8sclient"
@@ -230,14 +231,18 @@ func main() {
 		}
 	}
 
+	// Initialize cluster state service once for all reconciles
+	clusterStateService := clusterstate.NewClusterStateService(mgr.GetClient())
+
 	if err := (&controller.KubernetesClusterReconciler{
-		Client:             mgr.GetClient(),
-		Scheme:             mgr.GetScheme(),
-		AzureClientFactory: azureServices.ClientFactory,
-		AKSClusterManager:  azureServices.AKSClusterManager,
-		AgentPoolManager:   azureServices.AgentPoolManager,
-		VMSizeManager:      azureServices.VMSizeManager,
-		MachineClassMapper: azureServices.MachineClassMapper,
+		Client:              mgr.GetClient(),
+		Scheme:              mgr.GetScheme(),
+		AzureClientFactory:  azureServices.ClientFactory,
+		AKSClusterManager:   azureServices.AKSClusterManager,
+		AgentPoolManager:    azureServices.AgentPoolManager,
+		VMSizeManager:       azureServices.VMSizeManager,
+		MachineClassMapper:  azureServices.MachineClassMapper,
+		ClusterStateService: clusterStateService,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "KubernetesCluster")
 		os.Exit(1)
