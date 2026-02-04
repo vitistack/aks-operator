@@ -32,7 +32,7 @@ updates:
 
   # Maintain dependencies for Helm charts
   - package-ecosystem: "github-actions"
-    directory: "/charts/talos-operator/"
+    directory: "/charts/aks-operator/"
     schedule:
       interval: "weekly"
     open-pull-requests-limit: 10
