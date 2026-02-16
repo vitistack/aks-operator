@@ -4,7 +4,7 @@ Vitistack Kubernetes provider for AKS (Azure Kubernetes Service)
 
 ## Prerequisites
 
-- Go 1.25+
+- Go 1.26+
 - Azure subscription with permissions to create AKS clusters
 - kubectl configured for your cluster
 - Azure CLI (for obtaining credentials)
@@ -13,12 +13,12 @@ Vitistack Kubernetes provider for AKS (Azure Kubernetes Service)
 
 The operator requires Azure credentials to manage AKS clusters. Choose your authentication method:
 
-| Method                                                         | Best For              | Admin Required      | Works in Cluster? |
-| -------------------------------------------------------------- | --------------------- | ------------------- | ----------------- |
-| [User Credentials (Azure CLI)](docs/azure-user-credentials.md) | Local development     | No                  | ❌ No             |
-| [Service Principal](docs/azure-service-principal.md)           | Production, CI/CD     | Yes (initial setup) | ✅ Yes            |
-| [Workload Identity](docs/azure-workload-identity.md)           | Running in AKS        | Yes                 | ✅ Yes            |
-| Managed Identity                                               | Azure VMs/VMSS nodes  | Yes                 | ✅ Yes            |
+| Method                                                         | Best For             | Admin Required      | Works in Cluster? |
+| -------------------------------------------------------------- | -------------------- | ------------------- | ----------------- |
+| [User Credentials (Azure CLI)](docs/azure-user-credentials.md) | Local development    | No                  | ❌ No             |
+| [Service Principal](docs/azure-service-principal.md)           | Production, CI/CD    | Yes (initial setup) | ✅ Yes            |
+| [Workload Identity](docs/azure-workload-identity.md)           | Running in AKS       | Yes                 | ✅ Yes            |
+| Managed Identity                                               | Azure VMs/VMSS nodes | Yes                 | ✅ Yes            |
 
 > **Important:** User credentials (Azure CLI) only work when running the operator locally with `make run`.
 > To deploy the operator in a Kubernetes cluster, you **must** use Service Principal, Workload Identity, or Managed Identity.
@@ -55,6 +55,7 @@ The operator is available as an OCI Helm chart from GitHub Container Registry.
 
 > **⚠️ Authentication Required:** The operator requires Azure credentials to function.
 > User credentials (Azure CLI) do **not** work in a cluster - you must configure one of:
+>
 > - Service Principal (recommended)
 > - Workload Identity (for AKS clusters)
 > - Managed Identity (for Azure VM/VMSS nodes)
@@ -118,24 +119,24 @@ helm install aks-operator ./charts/aks-operator \
 
 #### Configuration
 
-| Parameter | Description | Default |
-|-----------|-------------|---------|
-| `replicaCount` | Number of replicas | `1` |
-| `image.repository` | Image repository | `ghcr.io/vitistack/viti-aks-operator` |
-| `image.tag` | Image tag | `""` (uses chart appVersion) |
-| `image.pullPolicy` | Image pull policy | `IfNotPresent` |
-| `serviceAccount.create` | Create service account | `true` |
-| `rbac.create` | Create RBAC resources | `true` |
-| `leaderElection.enabled` | Enable leader election | `false` |
-| `azure.existingSecret` | Name of existing secret with Azure credentials | `""` |
-| `azure.subscriptionId` | Azure Subscription ID | `""` |
-| `azure.tenantId` | Azure Tenant ID | `""` |
-| `azure.clientId` | Azure Client ID (Service Principal) | `""` |
-| `azure.clientSecret` | Azure Client Secret | `""` |
-| `env` | Additional environment variables | `[]` |
-| `envFrom` | Additional envFrom sources | `[]` |
-| `resources.limits.cpu` | CPU limit | `100m` |
-| `resources.limits.memory` | Memory limit | `128Mi` |
+| Parameter                 | Description                                    | Default                               |
+| ------------------------- | ---------------------------------------------- | ------------------------------------- |
+| `replicaCount`            | Number of replicas                             | `1`                                   |
+| `image.repository`        | Image repository                               | `ghcr.io/vitistack/viti-aks-operator` |
+| `image.tag`               | Image tag                                      | `""` (uses chart appVersion)          |
+| `image.pullPolicy`        | Image pull policy                              | `IfNotPresent`                        |
+| `serviceAccount.create`   | Create service account                         | `true`                                |
+| `rbac.create`             | Create RBAC resources                          | `true`                                |
+| `leaderElection.enabled`  | Enable leader election                         | `false`                               |
+| `azure.existingSecret`    | Name of existing secret with Azure credentials | `""`                                  |
+| `azure.subscriptionId`    | Azure Subscription ID                          | `""`                                  |
+| `azure.tenantId`          | Azure Tenant ID                                | `""`                                  |
+| `azure.clientId`          | Azure Client ID (Service Principal)            | `""`                                  |
+| `azure.clientSecret`      | Azure Client Secret                            | `""`                                  |
+| `env`                     | Additional environment variables               | `[]`                                  |
+| `envFrom`                 | Additional envFrom sources                     | `[]`                                  |
+| `resources.limits.cpu`    | CPU limit                                      | `100m`                                |
+| `resources.limits.memory` | Memory limit                                   | `128Mi`                               |
 
 See [values.yaml](charts/aks-operator/values.yaml) for all available options.
 
