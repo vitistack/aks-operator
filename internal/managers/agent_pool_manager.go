@@ -187,8 +187,8 @@ func (m *AgentPoolManagerImpl) ReconcileAgentPools(ctx context.Context, kubernet
 func (m *AgentPoolManagerImpl) buildAgentPool(nodePool vitistackv1alpha1.KubernetesClusterNodePool, vmSize string) armcontainerservice.AgentPool {
 	agentPool := armcontainerservice.AgentPool{
 		Properties: &armcontainerservice.ManagedClusterAgentPoolProfileProperties{
-			Count:  to.Ptr(safeIntToInt32(nodePool.Replicas)),
-			VMSize: to.Ptr(vmSize),
+			Count:  new(safeIntToInt32(nodePool.Replicas)),
+			VMSize: new(vmSize),
 			Mode:   to.Ptr(armcontainerservice.AgentPoolModeUser),
 			OSType: to.Ptr(armcontainerservice.OSTypeLinux),
 			Type:   to.Ptr(armcontainerservice.AgentPoolTypeVirtualMachineScaleSets),
@@ -196,22 +196,22 @@ func (m *AgentPoolManagerImpl) buildAgentPool(nodePool vitistackv1alpha1.Kuberne
 	}
 
 	if nodePool.Autoscaling.Enabled {
-		agentPool.Properties.EnableAutoScaling = to.Ptr(true)
-		agentPool.Properties.MinCount = to.Ptr(safeIntToInt32(nodePool.Autoscaling.MinReplicas))
-		agentPool.Properties.MaxCount = to.Ptr(safeIntToInt32(nodePool.Autoscaling.MaxReplicas))
+		agentPool.Properties.EnableAutoScaling = new(true)
+		agentPool.Properties.MinCount = new(safeIntToInt32(nodePool.Autoscaling.MinReplicas))
+		agentPool.Properties.MaxCount = new(safeIntToInt32(nodePool.Autoscaling.MaxReplicas))
 	} else {
-		agentPool.Properties.EnableAutoScaling = to.Ptr(false)
+		agentPool.Properties.EnableAutoScaling = new(false)
 	}
 
 	if nodePool.Version != "" {
-		agentPool.Properties.OrchestratorVersion = to.Ptr(nodePool.Version)
+		agentPool.Properties.OrchestratorVersion = new(nodePool.Version)
 	}
 
 	if len(nodePool.Taint) > 0 {
 		taints := make([]*string, 0, len(nodePool.Taint))
 		for _, taint := range nodePool.Taint {
 			taintStr := fmt.Sprintf("%s=%s:%s", taint.Key, taint.Value, taint.Effect)
-			taints = append(taints, to.Ptr(taintStr))
+			taints = append(taints, new(taintStr))
 		}
 		agentPool.Properties.NodeTaints = taints
 	}
@@ -219,14 +219,14 @@ func (m *AgentPoolManagerImpl) buildAgentPool(nodePool vitistackv1alpha1.Kuberne
 	if len(nodePool.Metadata.Labels) > 0 {
 		agentPool.Properties.NodeLabels = make(map[string]*string)
 		for k, v := range nodePool.Metadata.Labels {
-			agentPool.Properties.NodeLabels[k] = to.Ptr(v)
+			agentPool.Properties.NodeLabels[k] = new(v)
 		}
 	}
 
 	agentPool.Properties.AvailabilityZones = []*string{
-		to.Ptr("1"),
-		to.Ptr("2"),
-		to.Ptr("3"),
+		new("1"),
+		new("2"),
+		new("3"),
 	}
 
 	return agentPool

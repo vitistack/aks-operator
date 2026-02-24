@@ -202,16 +202,16 @@ func (m *AKSClusterManagerImpl) buildManagedCluster(ctx context.Context, kuberne
 	agentPoolProfiles := m.buildInitialAgentPoolProfiles(ctx, kubernetesCluster)
 
 	managedCluster := armcontainerservice.ManagedCluster{
-		Location: to.Ptr(location),
+		Location: new(location),
 		Tags:     m.buildTags(kubernetesCluster),
 		Identity: &armcontainerservice.ManagedClusterIdentity{
 			Type: to.Ptr(armcontainerservice.ResourceIdentityTypeSystemAssigned),
 		},
 		Properties: &armcontainerservice.ManagedClusterProperties{
-			DNSPrefix:         to.Ptr(dnsPrefix),
-			KubernetesVersion: to.Ptr(kubernetesVersion),
+			DNSPrefix:         new(dnsPrefix),
+			KubernetesVersion: new(kubernetesVersion),
 			AgentPoolProfiles: agentPoolProfiles,
-			EnableRBAC:        to.Ptr(true),
+			EnableRBAC:        new(true),
 			NetworkProfile: &armcontainerservice.NetworkProfile{
 				NetworkPlugin: to.Ptr(armcontainerservice.NetworkPluginAzure),
 				NetworkPolicy: to.Ptr(armcontainerservice.NetworkPolicyAzure),
@@ -239,13 +239,13 @@ func (m *AKSClusterManagerImpl) buildInitialAgentPoolProfiles(
 	vmSize := m.resolveVMSize(ctx, controlPlane.MachineClass, location, interfaces.VMPurposeGeneralPurpose)
 
 	systemPool := &armcontainerservice.ManagedClusterAgentPoolProfile{
-		Name:              to.Ptr("system"),
-		Count:             to.Ptr(safeIntToInt32(controlPlane.Replicas)),
-		VMSize:            to.Ptr(vmSize),
+		Name:              new("system"),
+		Count:             new(safeIntToInt32(controlPlane.Replicas)),
+		VMSize:            new(vmSize),
 		Mode:              to.Ptr(armcontainerservice.AgentPoolModeSystem),
 		OSType:            to.Ptr(armcontainerservice.OSTypeLinux),
 		Type:              to.Ptr(armcontainerservice.AgentPoolTypeVirtualMachineScaleSets),
-		EnableAutoScaling: to.Ptr(false),
+		EnableAutoScaling: new(false),
 	}
 	profiles = append(profiles, systemPool)
 
@@ -263,27 +263,27 @@ func (m *AKSClusterManagerImpl) buildAgentPoolProfile(ctx context.Context, nodeP
 	vmSize := m.resolveVMSize(ctx, nodePool.MachineClass, location, purpose)
 
 	profile := &armcontainerservice.ManagedClusterAgentPoolProfile{
-		Name:   to.Ptr(nodePool.Name),
-		Count:  to.Ptr(safeIntToInt32(nodePool.Replicas)),
-		VMSize: to.Ptr(vmSize),
+		Name:   new(nodePool.Name),
+		Count:  new(safeIntToInt32(nodePool.Replicas)),
+		VMSize: new(vmSize),
 		Mode:   to.Ptr(armcontainerservice.AgentPoolModeUser),
 		OSType: to.Ptr(armcontainerservice.OSTypeLinux),
 		Type:   to.Ptr(armcontainerservice.AgentPoolTypeVirtualMachineScaleSets),
 	}
 
 	if nodePool.Autoscaling.Enabled {
-		profile.EnableAutoScaling = to.Ptr(true)
-		profile.MinCount = to.Ptr(safeIntToInt32(nodePool.Autoscaling.MinReplicas))
-		profile.MaxCount = to.Ptr(safeIntToInt32(nodePool.Autoscaling.MaxReplicas))
+		profile.EnableAutoScaling = new(true)
+		profile.MinCount = new(safeIntToInt32(nodePool.Autoscaling.MinReplicas))
+		profile.MaxCount = new(safeIntToInt32(nodePool.Autoscaling.MaxReplicas))
 	} else {
-		profile.EnableAutoScaling = to.Ptr(false)
+		profile.EnableAutoScaling = new(false)
 	}
 
 	if len(nodePool.Taint) > 0 {
 		taints := make([]*string, 0, len(nodePool.Taint))
 		for _, taint := range nodePool.Taint {
 			taintStr := fmt.Sprintf("%s=%s:%s", taint.Key, taint.Value, taint.Effect)
-			taints = append(taints, to.Ptr(taintStr))
+			taints = append(taints, new(taintStr))
 		}
 		profile.NodeTaints = taints
 	}
@@ -291,7 +291,7 @@ func (m *AKSClusterManagerImpl) buildAgentPoolProfile(ctx context.Context, nodeP
 	if len(nodePool.Metadata.Labels) > 0 {
 		profile.NodeLabels = make(map[string]*string)
 		for k, v := range nodePool.Metadata.Labels {
-			profile.NodeLabels[k] = to.Ptr(v)
+			profile.NodeLabels[k] = new(v)
 		}
 	}
 
@@ -300,18 +300,18 @@ func (m *AKSClusterManagerImpl) buildAgentPoolProfile(ctx context.Context, nodeP
 
 func (m *AKSClusterManagerImpl) buildTags(kubernetesCluster *vitistackv1alpha1.KubernetesCluster) map[string]*string {
 	tags := map[string]*string{
-		"vitistack-cluster-id": to.Ptr(kubernetesCluster.Spec.Cluster.ClusterId),
-		"vitistack-name":       to.Ptr(kubernetesCluster.Name),
-		"vitistack-namespace":  to.Ptr(kubernetesCluster.Namespace),
-		"environment":          to.Ptr(kubernetesCluster.Spec.Cluster.Environment),
-		"managed-by":           to.Ptr("vitistack-aks-operator"),
+		"vitistack-cluster-id": new(kubernetesCluster.Spec.Cluster.ClusterId),
+		"vitistack-name":       new(kubernetesCluster.Name),
+		"vitistack-namespace":  new(kubernetesCluster.Namespace),
+		"environment":          new(kubernetesCluster.Spec.Cluster.Environment),
+		"managed-by":           new("vitistack-aks-operator"),
 	}
 
 	if kubernetesCluster.Spec.Cluster.Project != "" {
-		tags["project"] = to.Ptr(kubernetesCluster.Spec.Cluster.Project)
+		tags["project"] = new(kubernetesCluster.Spec.Cluster.Project)
 	}
 	if kubernetesCluster.Spec.Cluster.Workspace != "" {
-		tags["workspace"] = to.Ptr(kubernetesCluster.Spec.Cluster.Workspace)
+		tags["workspace"] = new(kubernetesCluster.Spec.Cluster.Workspace)
 	}
 
 	return tags
@@ -389,10 +389,9 @@ func (m *AKSClusterManagerImpl) needsUpdate(ctx context.Context, kubernetesClust
 	// Compare system node pool configuration
 	if kubernetesCluster.Spec.Topology.ControlPlane.Replicas > 0 && existingCluster.Properties.AgentPoolProfiles != nil {
 		// Safe conversion with bounds check (replicas should never exceed int32 max)
-		replicas := kubernetesCluster.Spec.Topology.ControlPlane.Replicas
-		if replicas > int(^int32(0)) {
-			replicas = int(^int32(0)) // Cap at max int32
-		}
+		replicas := min(kubernetesCluster.Spec.Topology.ControlPlane.Replicas,
+			// Cap at max int32
+			int(^int32(0)))
 		desiredCount := int32(replicas) // #nosec G115 -- bounds checked above
 		for _, pool := range existingCluster.Properties.AgentPoolProfiles {
 			if pool.Name != nil && *pool.Name == "system" {
