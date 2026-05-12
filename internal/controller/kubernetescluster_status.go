@@ -51,7 +51,7 @@ func (r *KubernetesClusterReconciler) initializeStatusState(kubernetesCluster *v
 	// Initialize versions if nil
 	if kubernetesCluster.Status.State.Versions == nil {
 		kubernetesCluster.Status.State.Versions = []vitistackv1alpha1.KubernetesClusterVersion{
-			{Name: "kubernetes", Version: kubernetesCluster.Spec.Topology.Version, Branch: "stable"},
+			{Name: componentNameKubernetes, Version: kubernetesCluster.Spec.Topology.Version, Branch: "stable"},
 		}
 	}
 
@@ -186,7 +186,7 @@ func (r *KubernetesClusterReconciler) updateClusterStatus(ctx context.Context, k
 	if aksCluster.Properties != nil && aksCluster.Properties.Fqdn != nil {
 		fqdn := *aksCluster.Properties.Fqdn
 		kubernetesCluster.Status.State.Endpoints = []vitistackv1alpha1.KubernetesClusterEndpoint{
-			{Name: "kubernetes", Address: fmt.Sprintf("https://%s:443", fqdn)},
+			{Name: componentNameKubernetes, Address: fmt.Sprintf("https://%s:443", fqdn)},
 		}
 	}
 

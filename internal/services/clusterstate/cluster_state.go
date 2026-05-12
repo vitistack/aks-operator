@@ -31,6 +31,13 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
+// Boolean string values used as secret data — keep as constants so callers
+// don't drift from each other and goconst stays quiet.
+const (
+	stateTrue  = "true"
+	stateFalse = "false"
+)
+
 // State keys for the cluster state secret
 const (
 	// Timestamps
@@ -156,12 +163,12 @@ func (s *ClusterStateService) createStateSecret(ctx context.Context, cluster *vi
 
 	data := map[string][]byte{
 		KeyCreatedAt:           []byte(time.Now().UTC().Format(time.RFC3339)),
-		KeyClusterProvisioning: []byte("false"),
-		KeyClusterProvisioned:  []byte("false"),
-		KeyNodePoolsReady:      []byte("false"),
-		KeyKubernetesAPIReady:  []byte("false"),
-		KeyClusterAccess:       []byte("false"),
-		KeyKubeconfigPresent:   []byte("false"),
+		KeyClusterProvisioning: []byte(stateFalse),
+		KeyClusterProvisioned:  []byte(stateFalse),
+		KeyNodePoolsReady:      []byte(stateFalse),
+		KeyKubernetesAPIReady:  []byte(stateFalse),
+		KeyClusterAccess:       []byte(stateFalse),
+		KeyKubeconfigPresent:   []byte(stateFalse),
 	}
 
 	secret := &corev1.Secret{
@@ -295,7 +302,7 @@ func (s *ClusterStateService) IsClusterProvisioned(ctx context.Context, cluster 
 	if err != nil {
 		return false, err
 	}
-	return value == "true", nil
+	return value == stateTrue, nil
 }
 
 // IsKubernetesAPIReady checks if the Kubernetes API is ready
@@ -304,19 +311,19 @@ func (s *ClusterStateService) IsKubernetesAPIReady(ctx context.Context, cluster 
 	if err != nil {
 		return false, err
 	}
-	return value == "true", nil
+	return value == stateTrue, nil
 }
 
 // SetClusterProvisioning marks the cluster as provisioning
 func (s *ClusterStateService) SetClusterProvisioning(ctx context.Context, cluster *vitistackv1alpha1.KubernetesCluster) error {
-	return s.UpdateState(ctx, cluster, KeyClusterProvisioning, "true")
+	return s.UpdateState(ctx, cluster, KeyClusterProvisioning, stateTrue)
 }
 
 // SetClusterFailed marks the cluster provisioning as failed
 func (s *ClusterStateService) SetClusterFailed(ctx context.Context, cluster *vitistackv1alpha1.KubernetesCluster, reason string) error {
 	updates := map[string]string{
-		KeyClusterProvisioning: "false",
-		KeyClusterProvisioned:  "false",
+		KeyClusterProvisioning: stateFalse,
+		KeyClusterProvisioned:  stateFalse,
 		KeyAKSProvisionState:   "Failed",
 	}
 	if reason != "" {
@@ -328,8 +335,8 @@ func (s *ClusterStateService) SetClusterFailed(ctx context.Context, cluster *vit
 // SetClusterProvisioned marks the cluster as provisioned
 func (s *ClusterStateService) SetClusterProvisioned(ctx context.Context, cluster *vitistackv1alpha1.KubernetesCluster, aksResourceID, aksClusterName, resourceGroupName string) error {
 	updates := map[string]string{
-		KeyClusterProvisioning: "false",
-		KeyClusterProvisioned:  "true",
+		KeyClusterProvisioning: stateFalse,
+		KeyClusterProvisioned:  stateTrue,
 		KeyAKSResourceID:       aksResourceID,
 		KeyAKSClusterName:      aksClusterName,
 		KeyResourceGroupName:   resourceGroupName,
@@ -339,15 +346,15 @@ func (s *ClusterStateService) SetClusterProvisioned(ctx context.Context, cluster
 
 // SetKubernetesAPIReady marks the Kubernetes API as ready
 func (s *ClusterStateService) SetKubernetesAPIReady(ctx context.Context, cluster *vitistackv1alpha1.KubernetesCluster) error {
-	return s.UpdateState(ctx, cluster, KeyKubernetesAPIReady, "true")
+	return s.UpdateState(ctx, cluster, KeyKubernetesAPIReady, stateTrue)
 }
 
 // SetClusterReady marks the cluster as fully ready
 func (s *ClusterStateService) SetClusterReady(ctx context.Context, cluster *vitistackv1alpha1.KubernetesCluster) error {
 	updates := map[string]string{
-		KeyClusterAccess:      "true",
-		KeyKubernetesAPIReady: "true",
-		KeyNodePoolsReady:     "true",
+		KeyClusterAccess:      stateTrue,
+		KeyKubernetesAPIReady: stateTrue,
+		KeyNodePoolsReady:     stateTrue,
 		KeyReadyAt:            time.Now().UTC().Format(time.RFC3339),
 	}
 	return s.UpdateStateMultiple(ctx, cluster, updates)
@@ -367,7 +374,7 @@ func (s *ClusterStateService) SetKubeconfig(ctx context.Context, cluster *vitist
 			secret.Data = make(map[string][]byte)
 		}
 		secret.Data[KeyKubeConfig] = kubeconfig
-		secret.Data[KeyKubeconfigPresent] = []byte("true")
+		secret.Data[KeyKubeconfigPresent] = []byte(stateTrue)
 
 		err = s.secretService.UpdateSecret(ctx, secret)
 		if err == nil {

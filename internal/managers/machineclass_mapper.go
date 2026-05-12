@@ -270,7 +270,7 @@ func (m *MachineClassMapperImpl) GetDefaultPurposeForCategory(category string) i
 		return interfaces.VMPurposeComputeOptimized
 	case "memory":
 		return interfaces.VMPurposeMemoryOptimized
-	case "gpu":
+	case workloadTypeGPU:
 		return interfaces.VMPurposeGPU
 	case "storage":
 		return interfaces.VMPurposeStorageOptimized
@@ -397,52 +397,52 @@ func (m *MachineClassMapperImpl) staticMapping(machineClassName string, purpose 
 	}
 
 	staticMappings := map[string]staticDef{
-		"small": {
-			generalPurpose:   "Standard_D2s_v5",
-			computeOptimized: "Standard_F2s_v2",
-			memoryOptimized:  "Standard_E2s_v5",
+		machineClassSmall: {
+			generalPurpose:   vmSizeStandardD2sV5,
+			computeOptimized: vmSizeStandardF2sV2,
+			memoryOptimized:  vmSizeStandardE2sV5,
 			cores:            2,
 			memoryGB:         8,
 		},
-		"medium": {
-			generalPurpose:   "Standard_D4s_v5",
-			computeOptimized: "Standard_F4s_v2",
-			memoryOptimized:  "Standard_E4s_v5",
+		machineClassMedium: {
+			generalPurpose:   vmSizeStandardD4sV5,
+			computeOptimized: vmSizeStandardF4sV2,
+			memoryOptimized:  vmSizeStandardE4sV5,
 			cores:            4,
 			memoryGB:         16,
 		},
-		"large": {
-			generalPurpose:   "Standard_D8s_v5",
-			computeOptimized: "Standard_F8s_v2",
-			memoryOptimized:  "Standard_E8s_v5",
+		machineClassLarge: {
+			generalPurpose:   vmSizeStandardD8sV5,
+			computeOptimized: vmSizeStandardF8sV2,
+			memoryOptimized:  vmSizeStandardE8sV5,
 			cores:            8,
 			memoryGB:         32,
 		},
-		"xlarge": {
-			generalPurpose:   "Standard_D16s_v5",
-			computeOptimized: "Standard_F16s_v2",
-			memoryOptimized:  "Standard_E16s_v5",
+		machineClassXLarge: {
+			generalPurpose:   vmSizeStandardD16sV5,
+			computeOptimized: vmSizeStandardF16sV2,
+			memoryOptimized:  vmSizeStandardE16sV5,
 			cores:            16,
 			memoryGB:         64,
 		},
-		"largecpu": {
-			generalPurpose:   "Standard_F8s_v2",
-			computeOptimized: "Standard_F8s_v2",
-			memoryOptimized:  "Standard_F8s_v2",
+		machineClassLargeCPU: {
+			generalPurpose:   vmSizeStandardF8sV2,
+			computeOptimized: vmSizeStandardF8sV2,
+			memoryOptimized:  vmSizeStandardF8sV2,
 			cores:            8,
 			memoryGB:         16,
 		},
-		"largememory": {
-			generalPurpose:   "Standard_E8s_v5",
-			computeOptimized: "Standard_E8s_v5",
-			memoryOptimized:  "Standard_E8s_v5",
+		machineClassLargeMemory: {
+			generalPurpose:   vmSizeStandardE8sV5,
+			computeOptimized: vmSizeStandardE8sV5,
+			memoryOptimized:  vmSizeStandardE8sV5,
 			cores:            8,
 			memoryGB:         64,
 		},
-		"gpu": {
-			generalPurpose:   "Standard_NC6s_v3",
-			computeOptimized: "Standard_NC6s_v3",
-			memoryOptimized:  "Standard_NC6s_v3",
+		workloadTypeGPU: {
+			generalPurpose:   vmSizeStandardNC6sV3,
+			computeOptimized: vmSizeStandardNC6sV3,
+			memoryOptimized:  vmSizeStandardNC6sV3,
 			cores:            6,
 			memoryGB:         112,
 		},
@@ -452,7 +452,7 @@ func (m *MachineClassMapperImpl) staticMapping(machineClassName string, purpose 
 	def, ok := staticMappings[name]
 	if !ok {
 		// Default to medium
-		def = staticMappings["medium"]
+		def = staticMappings[machineClassMedium]
 	}
 
 	var vmSize string

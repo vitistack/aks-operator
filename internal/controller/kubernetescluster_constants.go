@@ -51,4 +51,7 @@ const (
 	// Annotations
 	AnnotationAKSClusterID  = "vitistack.io/aks-cluster-id"
 	AnnotationKubeSystemUID = "vitistack.io/kube-system-uid"
+
+	// Component name reported in KubernetesCluster status entries.
+	componentNameKubernetes = "kubernetes"
 )

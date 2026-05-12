@@ -326,19 +326,19 @@ func (m *AgentPoolManagerImpl) staticFallbackVMSize(machineClass string, purpose
 	}
 
 	staticMappings := map[string]vmSizes{
-		"small":       {"Standard_D2s_v5", "Standard_F2s_v2", "Standard_E2s_v5", "Standard_NC4as_T4_v3"},
-		"medium":      {"Standard_D4s_v5", "Standard_F4s_v2", "Standard_E4s_v5", "Standard_NC8as_T4_v3"},
-		"large":       {"Standard_D8s_v5", "Standard_F8s_v2", "Standard_E8s_v5", "Standard_NC16as_T4_v3"},
-		"xlarge":      {"Standard_D16s_v5", "Standard_F16s_v2", "Standard_E16s_v5", "Standard_NC64as_T4_v3"},
-		"largecpu":    {"Standard_F8s_v2", "Standard_F8s_v2", "Standard_F8s_v2", "Standard_NC6s_v3"},
-		"largememory": {"Standard_E8s_v5", "Standard_E8s_v5", "Standard_E8s_v5", "Standard_NC6s_v3"},
-		"gpu":         {"Standard_NC6s_v3", "Standard_NC6s_v3", "Standard_NC6s_v3", "Standard_NC6s_v3"},
+		machineClassSmall:       {vmSizeStandardD2sV5, vmSizeStandardF2sV2, vmSizeStandardE2sV5, vmSizeStandardNC4asT4V3},
+		machineClassMedium:      {vmSizeStandardD4sV5, vmSizeStandardF4sV2, vmSizeStandardE4sV5, vmSizeStandardNC8asT4V3},
+		machineClassLarge:       {vmSizeStandardD8sV5, vmSizeStandardF8sV2, vmSizeStandardE8sV5, vmSizeStandardNC16asT4V3},
+		machineClassXLarge:      {vmSizeStandardD16sV5, vmSizeStandardF16sV2, vmSizeStandardE16sV5, vmSizeStandardNC64asT4V3},
+		machineClassLargeCPU:    {vmSizeStandardF8sV2, vmSizeStandardF8sV2, vmSizeStandardF8sV2, vmSizeStandardNC6sV3},
+		machineClassLargeMemory: {vmSizeStandardE8sV5, vmSizeStandardE8sV5, vmSizeStandardE8sV5, vmSizeStandardNC6sV3},
+		workloadTypeGPU:         {vmSizeStandardNC6sV3, vmSizeStandardNC6sV3, vmSizeStandardNC6sV3, vmSizeStandardNC6sV3},
 	}
 
 	name := strings.ToLower(machineClass)
 	sizes, ok := staticMappings[name]
 	if !ok {
-		sizes = staticMappings["medium"]
+		sizes = staticMappings[machineClassMedium]
 	}
 
 	switch purpose {

@@ -28,16 +28,20 @@ type AzureServices struct {
 func CheckPrerequisites() {
 	vlog.Info("Running prerequisite checks...")
 
+	const (
+		vitistackGroup   = "vitistack.io"
+		vitistackVersion = "v1alpha1"
+	)
 	crdcheck.MustEnsureInstalled(context.TODO(),
 		// your CRD plural
-		crdcheck.Ref{Group: "vitistack.io", Version: "v1alpha1", Resource: "machines"},
-		crdcheck.Ref{Group: "vitistack.io", Version: "v1alpha1", Resource: "kubernetesclusters"},
-		crdcheck.Ref{Group: "vitistack.io", Version: "v1alpha1", Resource: "kubernetesproviders"},
-		crdcheck.Ref{Group: "vitistack.io", Version: "v1alpha1", Resource: "machineproviders"},
-		crdcheck.Ref{Group: "vitistack.io", Version: "v1alpha1", Resource: "networknamespaces"},
-		crdcheck.Ref{Group: "vitistack.io", Version: "v1alpha1", Resource: "networkconfigurations"},
-		crdcheck.Ref{Group: "vitistack.io", Version: "v1alpha1", Resource: "vitistacks"},
-		crdcheck.Ref{Group: "vitistack.io", Version: "v1alpha1", Resource: "machineclasses"},
+		crdcheck.Ref{Group: vitistackGroup, Version: vitistackVersion, Resource: "machines"},
+		crdcheck.Ref{Group: vitistackGroup, Version: vitistackVersion, Resource: "kubernetesclusters"},
+		crdcheck.Ref{Group: vitistackGroup, Version: vitistackVersion, Resource: "kubernetesproviders"},
+		crdcheck.Ref{Group: vitistackGroup, Version: vitistackVersion, Resource: "machineproviders"},
+		crdcheck.Ref{Group: vitistackGroup, Version: vitistackVersion, Resource: "networknamespaces"},
+		crdcheck.Ref{Group: vitistackGroup, Version: vitistackVersion, Resource: "networkconfigurations"},
+		crdcheck.Ref{Group: vitistackGroup, Version: vitistackVersion, Resource: "vitistacks"},
+		crdcheck.Ref{Group: vitistackGroup, Version: vitistackVersion, Resource: "machineclasses"},
 	)
 
 	vlog.Info("✅ Prerequisite checks passed")
