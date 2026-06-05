@@ -19,9 +19,12 @@ package controller
 import (
 	"context"
 	"fmt"
+	"os"
+	"strconv"
 	"strings"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/containerservice/armcontainerservice/v6"
+	"github.com/vitistack/aks-operator/internal/consts"
 	"github.com/vitistack/aks-operator/internal/services/clusterstate"
 	"github.com/vitistack/aks-operator/pkg/interfaces"
 	"github.com/vitistack/common/pkg/loggers/vlog"
@@ -30,6 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
@@ -320,6 +324,24 @@ func (r *KubernetesClusterReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&vitistackv1alpha1.KubernetesCluster{}).
 		WithEventFilter(aksProviderPredicate).
+		WithOptions(controller.Options{MaxConcurrentReconciles: maxConcurrentReconciles()}).
 		Named("kubernetescluster").
 		Complete(r)
+}
+
+// maxConcurrentReconciles returns the number of parallel reconciliations per
+// controller, read from MAX_CONCURRENT_RECONCILES. Defaults to 5 when unset or
+// invalid; never returns less than 1. The workqueue serializes by object key,
+// so concurrency only applies across distinct objects.
+func maxConcurrentReconciles() int {
+	const defaultMaxConcurrent = 5
+	v := strings.TrimSpace(os.Getenv(consts.MAX_CONCURRENT_RECONCILES))
+	if v == "" {
+		return defaultMaxConcurrent
+	}
+	n, err := strconv.Atoi(v)
+	if err != nil || n < 1 {
+		return defaultMaxConcurrent
+	}
+	return n
 }

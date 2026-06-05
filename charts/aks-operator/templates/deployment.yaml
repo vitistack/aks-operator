@@ -40,8 +40,10 @@ spec:
           {{- end }}
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
-          {{- if or .Values.azure.existingSecret .Values.azure.subscriptionId .Values.env }}
           env:
+            # Controller concurrency: max objects reconciled in parallel
+            - name: MAX_CONCURRENT_RECONCILES
+              value: {{ .Values.maxConcurrentReconciles | default 5 | quote }}
             {{- if .Values.azure.subscriptionId }}
             - name: AZURE_SUBSCRIPTION_ID
               value: {{ .Values.azure.subscriptionId | quote }}
@@ -61,7 +63,6 @@ spec:
             {{- with .Values.env }}
             {{- toYaml . | nindent 12 }}
             {{- end }}
-          {{- end }}
           {{- if or .Values.azure.existingSecret .Values.envFrom }}
           envFrom:
             {{- if .Values.azure.existingSecret }}

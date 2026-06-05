@@ -26,4 +26,9 @@ var (
 	TENANT_CONFIGMAP_NAMESPACE = "TENANT_CONFIGMAP_NAMESPACE"
 	TENANT_CONFIGMAP_DATA_KEY  = "TENANT_CONFIGMAP_DATA_KEY"
 	DEFAULT_KUBERNETES_VERSION = "DEFAULT_KUBERNETES_VERSION"
+
+	// MAX_CONCURRENT_RECONCILES is the maximum number of reconciliations run in
+	// parallel per controller. The workqueue still serializes by object key, so
+	// concurrency only applies across distinct objects. Defaults to 5 when unset.
+	MAX_CONCURRENT_RECONCILES = "MAX_CONCURRENT_RECONCILES"
 )
