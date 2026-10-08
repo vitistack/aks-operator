@@ -4,7 +4,7 @@ Vitistack Kubernetes provider for AKS (Azure Kubernetes Service)
 
 ## Prerequisites
 
-- Go 1.26+
+- Go 1.27+
 - Azure subscription with permissions to create AKS clusters
 - kubectl configured for your cluster
 - Azure CLI (for obtaining credentials)
