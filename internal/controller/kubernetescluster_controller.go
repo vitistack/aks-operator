@@ -106,7 +106,7 @@ func (r *KubernetesClusterReconciler) Reconcile(ctx context.Context, req ctrl.Re
 			vlog.Error(err, "failed to add finalizer", "cluster", kubernetesCluster.Name)
 			return ctrl.Result{}, err
 		}
-		return ctrl.Result{Requeue: true}, nil
+		return ctrl.Result{RequeueAfter: ControllerRequeueDelay}, nil
 	}
 
 	// Set initial status to Creating if phase is empty (new cluster)
