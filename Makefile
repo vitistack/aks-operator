@@ -125,6 +125,42 @@ lint-fix: golangci-lint ## Run golangci-lint linter and perform fixes
 lint-config: golangci-lint ## Verify golangci-lint linter configuration
 	$(GOLANGCI_LINT) config verify
 
+##@ Pre-commit
+
+# Snapshot of the working tree (tracked diff + untracked files) used to detect
+# files rewritten by go mod tidy / controller-gen / go fmt during precheck.
+TREE_STATE = { git diff HEAD; git ls-files --others --exclude-standard; } | shasum | cut -d' ' -f1
+
+.PHONY: precheck
+precheck: ## Run every check CI runs (tidy, build, lint, test, gosec, govulncheck, helm lint) before commit/push.
+	@before=$$($(TREE_STATE)); \
+	echo -e "$(CYAN)==> go mod tidy + verify$(RESET)"; \
+	go mod tidy && go mod verify; \
+	echo -e "$(CYAN)==> build$(RESET)"; \
+	$(MAKE) --no-print-directory build; \
+	echo -e "$(CYAN)==> lint$(RESET)"; \
+	$(MAKE) --no-print-directory lint; \
+	echo -e "$(CYAN)==> test$(RESET)"; \
+	$(MAKE) --no-print-directory test; \
+	echo -e "$(CYAN)==> gosec$(RESET)"; \
+	$(MAKE) --no-print-directory gosec; \
+	echo -e "$(CYAN)==> govulncheck$(RESET)"; \
+	$(MAKE) --no-print-directory govulncheck; \
+	if command -v helm >/dev/null 2>&1; then \
+		echo -e "$(CYAN)==> helm lint$(RESET)"; \
+		helm lint charts/aks-operator; \
+	else \
+		echo -e "$(YELLOW)helm not installed, skipping helm lint$(RESET)"; \
+	fi; \
+	after=$$($(TREE_STATE)); \
+	if [ "$$before" != "$$after" ]; then \
+		echo -e "$(YELLOW)$(BOLD)precheck modified files (go.mod/go.sum, generated code, CRDs/RBAC or formatting).$(RESET)"; \
+		echo -e "$(YELLOW)Review and stage them before committing:$(RESET)"; \
+		git status --short; \
+		exit 1; \
+	fi; \
+	echo -e "$(GREEN)$(BOLD)All prechecks passed - ready to commit and push.$(RESET)"
+
 ##@ SBOM (Software Bill of Materials)
 SYFT ?= $(LOCALBIN)/syft
 SYFT_VERSION ?= latest
@@ -279,7 +315,8 @@ ENVTEST_VERSION ?= $(shell go list -m -f "{{ .Version }}" sigs.k8s.io/controller
 #ENVTEST_K8S_VERSION is the version of Kubernetes to use for setting up ENVTEST binaries (i.e. 1.31)
 ENVTEST_K8S_VERSION ?= $(shell go list -m -f "{{ .Version }}" k8s.io/api | awk -F'[v.]' '{printf "1.%d", $$3}')
 GOLANGCI_LINT_VERSION ?= latest
-GOSEC_VERSION ?= latest
+# Pinned to gosec main: v2.29.0 bundles golang.org/x/tools v0.49.0, which cannot read Go 1.27.2 export data. Switch back to latest once v2.29.1+ is released.
+GOSEC_VERSION ?= v2.29.1-0.20261005092323-d2b649ec0182
 GOVULNCHECK_VERSION ?= latest
 
 ## VitiStack CRDs (download/install)
