@@ -316,7 +316,7 @@ ENVTEST_VERSION ?= $(shell go list -m -f "{{ .Version }}" sigs.k8s.io/controller
 ENVTEST_K8S_VERSION ?= $(shell go list -m -f "{{ .Version }}" k8s.io/api | awk -F'[v.]' '{printf "1.%d", $$3}')
 GOLANGCI_LINT_VERSION ?= latest
 # Pinned to gosec main: v2.29.0 bundles golang.org/x/tools v0.49.0, which cannot read Go 1.27.2 export data. Switch back to latest once v2.29.1+ is released.
-GOSEC_VERSION ?= v2.29.1-0.20261005092323-d2b649ec0182
+GOSEC_VERSION ?= master
 GOVULNCHECK_VERSION ?= latest
 
 ## VitiStack CRDs (download/install)
